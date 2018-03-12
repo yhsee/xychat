@@ -1,0 +1,86 @@
+; Microsoft MPEG-4 VKI Video Codec install
+
+
+[Source Media Descriptions]
+1  = "MS MPEG-4 Codec Disk"  , TAGFILE = MPG4c32.dll
+
+[Installable.Drivers]
+mpg4 = 1:MPG4c32.dll, "vidc.mpg4", "Microsoft MPEG-4 Video Codec V1" , , ,
+mp42 = 1:MPG4c32.dll, "vidc.mp42", "Microsoft MPEG-4 Video Codec V2" , , ,
+mp43 = 1:MPG4c32.dll, "vidc.mp43", "Microsoft MPEG-4 Video Codec V3" , , ,
+
+
+[Version]
+Signature = "$CHICAGO$"
+Class=NoDriver  ; Class=Media
+
+[Manufacturer]
+%mfgname%=generic
+
+[DefaultInstall]
+CopyFiles=MPEG4.Copy,MPEG4.Copy.Inf
+Updateinis = MPEG4.Updateini
+addreg = MPEG4.AddReg,MPEG4.DoReg
+MediaType = SOFTWARE
+ErrorControl=0 
+
+[MPEG4.Copy]
+MPG4ds32.ax,,,4
+MPG4c32.dll,,,4
+
+
+[MPEG4.Copy.Inf]
+Mpg4vki.inf,,,4
+
+[MPEG4.UpdateIni]
+system.ini, drivers32,,"vidc.MPG4=MPG4c32.dll"
+system.ini, drivers32,,"vidc.MP42=MPG4c32.dll"
+system.ini, drivers32,,"vidc.MP43=MPG4c32.dll"
+
+
+[MPEG4.DelIni]
+system.ini, drivers32,"vidc.MPG4=MPG4c32.dll",
+system.ini, drivers32,"vidc.MP42=MPG4c32.dll",
+system.ini, drivers32,"vidc.MP43=MPG4c32.dll",
+
+[MPEG4.AddReg]
+HKLM,SYSTEM\CurrentControlSet\Control\MediaResources\icm\vidc.MPG4,Description,,"Microsoft MPEG-4 Video Codec V1"
+HKLM,SYSTEM\CurrentControlSet\Control\MediaResources\icm\vidc.MPG4,Driver,,MPG4c32.dll
+HKLM,SYSTEM\CurrentControlSet\Control\MediaResources\icm\vidc.MPG4,FriendlyName,,"Microsoft MPEG-4 Video Codec V1"
+
+HKLM,SYSTEM\CurrentControlSet\Control\MediaResources\icm\vidc.MP42,Description,,"Microsoft MPEG-4 Video Codec V2"
+HKLM,SYSTEM\CurrentControlSet\Control\MediaResources\icm\vidc.MP42,Driver,,MPG4c32.dll
+HKLM,SYSTEM\CurrentControlSet\Control\MediaResources\icm\vidc.MP42,FriendlyName,,"Microsoft MPEG-4 Video Codec V2"
+
+HKLM,SYSTEM\CurrentControlSet\Control\MediaResources\icm\vidc.MP43,Description,,"Microsoft MPEG-4 Video Codec V3"
+HKLM,SYSTEM\CurrentControlSet\Control\MediaResources\icm\vidc.MP43,Driver,,MPG4c32.dll
+HKLM,SYSTEM\CurrentControlSet\Control\MediaResources\icm\vidc.MP43,FriendlyName,,"Microsoft MPEG-4 Video Codec V3"
+
+[MPEG4.DoReg]
+HKLM,Software\Microsoft\Windows\CurrentVersion\RunOnce\Setup,"Registering MS MPEG4 ActiveX filter...",,"%11%\regsvr32.exe /s %11%\mpg4ds32.ax"
+
+[MPEG4.DelReg]
+HKLM,SYSTEM\CurrentControlSet\Control\MediaResources\icm\vidc.MPG4
+
+HKLM,SYSTEM\CurrentControlSet\Control\MediaResources\icm\vidc.MP42
+
+HKLM,SYSTEM\CurrentControlSet\Control\MediaResources\icm\vidc.MP43
+
+
+[DestinationDirs]
+DefaultDestDir = 11	; LDID_SYS %windir%\System32
+MPEG4.Copy = 11
+MPEG4.Copy.Inf = 17     ; %windir%\inf
+
+[SourceDisksNames]
+1="MS MPEG-4 Video Codec Install Disk",, 0001
+
+[SourceDisksFiles]
+MPG4c32.dll=1
+MPG4ds32.ax=1
+mpg4vki.inf=1
+
+[Strings]
+MediaClassName="Media Devices"
+mfgname="Microsoft"
+

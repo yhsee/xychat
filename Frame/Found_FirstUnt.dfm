@@ -1,0 +1,141 @@
+object Found_First: TFound_First
+  Left = 0
+  Top = 0
+  Width = 440
+  Height = 276
+  TabOrder = 0
+  object Panel_Frame: TTntPanel
+    Left = 0
+    Top = 0
+    Width = 440
+    Height = 276
+    Align = alClient
+    BevelOuter = bvNone
+    Color = clWhite
+    Font.Charset = ANSI_CHARSET
+    Font.Color = clBlack
+    Font.Height = -12
+    Font.Name = #23435#20307
+    Font.Style = []
+    ParentFont = False
+    TabOrder = 0
+    object Image_BackGroup: TImage
+      Left = 0
+      Top = 0
+      Width = 440
+      Height = 276
+      Align = alClient
+      Stretch = True
+    end
+    object TntLabel1: TTntLabel
+      Left = 28
+      Top = 19
+      Width = 120
+      Height = 12
+      Caption = #25353#20197#19979#32593#27573#26597#25214#32852#31995#20154
+      Font.Charset = ANSI_CHARSET
+      Font.Color = clBlack
+      Font.Height = -12
+      Font.Name = #23435#20307
+      Font.Style = []
+      ParentFont = False
+      Transparent = True
+    end
+    object Image_CutLine0: TImage
+      Left = 152
+      Top = 24
+      Width = 271
+      Height = 2
+      AutoSize = True
+    end
+    object TntLabel2: TTntLabel
+      Left = 28
+      Top = 166
+      Width = 120
+      Height = 12
+      Caption = #35831#24744#28155#21152#35201#26597#25214#30340#32593#27573
+      Font.Charset = ANSI_CHARSET
+      Font.Color = clBlack
+      Font.Height = -12
+      Font.Name = #23435#20307
+      Font.Style = []
+      ParentFont = False
+      Transparent = True
+    end
+    object Image_CutLine1: TImage
+      Left = 152
+      Top = 171
+      Width = 271
+      Height = 2
+      AutoSize = True
+    end
+    object Image_Found: TImage
+      Left = 261
+      Top = 230
+      Width = 77
+      Height = 24
+      Cursor = crHandPoint
+      Hint = #24320#22987#26597#25214
+      AutoSize = True
+      ParentShowHint = False
+      ShowHint = True
+    end
+    object Image_Close: TImage
+      Left = 341
+      Top = 230
+      Width = 77
+      Height = 24
+      Cursor = crHandPoint
+      Hint = #20851#38381
+      AutoSize = True
+      ParentShowHint = False
+      ShowHint = True
+    end
+    object SpeedButton1: TSpeedButton
+      Left = 312
+      Top = 182
+      Width = 41
+      Height = 22
+      Caption = #28155#21152
+      Flat = True
+      OnClick = SpeedButton1Click
+    end
+    object SpeedButton2: TSpeedButton
+      Left = 360
+      Top = 182
+      Width = 41
+      Height = 22
+      Caption = #21024#38500
+      Flat = True
+      OnClick = SpeedButton2Click
+    end
+    object Ed_Key: TTntEdit
+      Left = 35
+      Top = 182
+      Width = 270
+      Height = 18
+      Ctl3D = False
+      Font.Charset = ANSI_CHARSET
+      Font.Color = clSilver
+      Font.Height = -12
+      Font.Name = #23435#20307
+      Font.Style = []
+      ParentCtl3D = False
+      ParentFont = False
+      TabOrder = 0
+      OnEnter = Ed_KeyEnter
+      OnExit = Ed_KeyExit
+    end
+    object frmListBox: TTntListBox
+      Left = 32
+      Top = 40
+      Width = 369
+      Height = 113
+      Ctl3D = False
+      ItemHeight = 12
+      MultiSelect = True
+      ParentCtl3D = False
+      TabOrder = 1
+    end
+  end
+end

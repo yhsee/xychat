@@ -1,0 +1,20 @@
+object myfirend_infor: Tmyfirend_infor
+  Left = 192
+  Top = 144
+  BorderStyle = bsNone
+  Caption = #22909#21451#36164#26009
+  ClientHeight = 342
+  ClientWidth = 482
+  Color = clBtnFace
+  Font.Charset = GB2312_CHARSET
+  Font.Color = clWindowText
+  Font.Height = -13
+  Font.Name = #26032#23435#20307
+  Font.Style = []
+  OldCreateOrder = False
+  Position = poDesktopCenter
+  Scaled = False
+  OnShow = FormShow
+  PixelsPerInch = 96
+  TextHeight = 13
+end

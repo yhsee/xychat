@@ -1,0 +1,90 @@
+object frmPMessage: TfrmPMessage
+  Left = 455
+  Top = 296
+  BorderStyle = bsNone
+  Caption = 'frmPMessage'
+  ClientHeight = 127
+  ClientWidth = 300
+  Color = clBtnFace
+  DefaultMonitor = dmDesktop
+  Font.Charset = GB2312_CHARSET
+  Font.Color = clWindowText
+  Font.Height = -12
+  Font.Name = #23435#20307
+  Font.Style = []
+  OldCreateOrder = False
+  Scaled = False
+  OnClose = FormClose
+  OnCreate = FormCreate
+  OnResize = FormResize
+  OnShow = FormShow
+  PixelsPerInch = 96
+  TextHeight = 12
+  object myimg: TImage
+    Left = 0
+    Top = 0
+    Width = 300
+    Height = 127
+    Transparent = True
+    OnMouseDown = myimgMouseDown
+    OnMouseMove = myimgMouseMove
+  end
+  object Msgtxts: TLabel
+    Left = 8
+    Top = 32
+    Width = 285
+    Height = 73
+    AutoSize = False
+    Caption = 'Msgtxts'
+    Transparent = True
+    Layout = tlCenter
+    WordWrap = True
+  end
+  object close_button: TLabel
+    Left = 261
+    Top = 108
+    Width = 24
+    Height = 12
+    Cursor = crHandPoint
+    Caption = #20851#38381
+    Transparent = True
+    OnClick = close_buttonClick
+  end
+  object StartDialog: TLabel
+    Left = 20
+    Top = 108
+    Width = 78
+    Height = 12
+    Cursor = crHandPoint
+    Caption = #31435#21363#24320#22987#23545#35805
+    Font.Charset = GB2312_CHARSET
+    Font.Color = clNavy
+    Font.Height = -12
+    Font.Name = #23435#20307
+    Font.Style = [fsBold, fsUnderline]
+    ParentFont = False
+    Transparent = True
+    Visible = False
+    OnClick = StartDialogClick
+  end
+  object Lab_Title: TTntLabel
+    Left = 48
+    Top = 9
+    Width = 52
+    Height = 12
+    Caption = #25552#31034#20449#24687
+    Font.Charset = GB2312_CHARSET
+    Font.Color = clWhite
+    Font.Height = -12
+    Font.Name = #23435#20307
+    Font.Style = [fsBold]
+    ParentFont = False
+    Transparent = True
+  end
+  object Timer1: TTimer
+    Interval = 4000
+    OnTimer = Timer1Timer
+    Left = 8
+    Top = 8
+  end
+end

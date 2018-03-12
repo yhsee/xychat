@@ -1,0 +1,53 @@
+object frmRemote: TfrmRemote
+  Left = 242
+  Top = 188
+  BorderStyle = bsNone
+  Caption = 'ReSvrfrm'
+  ClientHeight = 342
+  ClientWidth = 229
+  Color = clBtnFace
+  Font.Charset = GB2312_CHARSET
+  Font.Color = clWindowText
+  Font.Height = -12
+  Font.Name = #23435#20307
+  Font.Style = []
+  OldCreateOrder = False
+  Scaled = False
+  OnCreate = FormCreate
+  OnDestroy = TntFormDestroy
+  OnShow = FormShow
+  PixelsPerInch = 96
+  TextHeight = 12
+  object Lab_Yes: TLabel
+    Left = 64
+    Top = 152
+    Width = 24
+    Height = 12
+    Caption = #25509#21463
+    Transparent = True
+    OnClick = Lab_YesClick
+  end
+  object Lab_Close: TLabel
+    Left = 136
+    Top = 152
+    Width = 24
+    Height = 12
+    Caption = #25298#32477
+    Transparent = True
+    OnClick = Lab_CloseClick
+  end
+  object Lab_Info: TLabel
+    Left = 16
+    Top = 24
+    Width = 48
+    Height = 12
+    Caption = 'Lab_Info'
+    Font.Charset = GB2312_CHARSET
+    Font.Color = clWindowText
+    Font.Height = -12
+    Font.Name = #23435#20307
+    Font.Style = []
+    ParentFont = False
+    Transparent = True
+  end
+end
