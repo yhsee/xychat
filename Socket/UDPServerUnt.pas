@@ -12,7 +12,7 @@ interface
 {*******************************************************}
 
 uses
-  Windows, Messages, Sysutils, Classes,
+  Windows, Messages, Sysutils, Classes, 
   UDPCommonUnt,UDPBaseUnt,MultiTimerUnt,MultiTimerCommonUnt;
 
 type
@@ -29,8 +29,7 @@ type
 
     FConnected:Boolean;     //连接状态
 
-    OnProcessThread,                 //速度，进度，时钟    
-    HeartBeatThread,                 //心跳激活时钟
+    HeartBeatThread,                //心跳激活时钟
     OutHeartBeatThread: Pointer;    //心跳检测时钟
     procedure HeartBeatCheck(Sender: TObject);
     procedure OutHeartBeatCheck(Sender: TObject);
@@ -46,7 +45,7 @@ type
     procedure ResponseProcess(TmpData: PUDataPack);
 
     //处理简单数据包
-    procedure RecvSimpleProcess(TmpData: PUDataPack);
+    procedure RecvSimpleProcess(TmpData: PUDataPack; ABinding: TSocketHandle);
     
     function GetLocalPort: Word;
   protected
@@ -61,6 +60,7 @@ type
     FOnUDPRecvComplete: TRecvCompleteEvent;
     FOnSendProcessEvent,
     FOnRecvProcessEvent: TSpeedProcessEvent;
+    FOnUDPSimpleRead:TUDPReadEvent;
     //--------------------------------------------------------------------------
     procedure NewUDataPack(var TmpData: PUDataPack);
     procedure SendUBuffer(iAction:Byte);overload;
@@ -68,23 +68,23 @@ type
     procedure SendUBuffer(TmpData: PUDataPack);overload;
     procedure SendUBuffer(TmpData: PUDataPack;sHost:String;iPort:Word);overload;
     //--------------------------------------------------------------------------
-    procedure UDPBaseOnUDPRead(Sender: TObject; var buf;bufSize:Word;ABinding: TSocketHandle); override;
+    procedure UDPBaseOnUDPRead(Sender: TObject; var buf;bufSize:Word;ABinding: TSocketHandle); override;     
     procedure UDPServerOnUDPRead(TmpData: PUDataPack); virtual;
-    procedure OnProcessCheck(Sendder: TObject); virtual;
     //--------------------------------------------------------------------------
-    procedure SendBuffer(sHost:String;iPort:Word;var buf;bufSize:Word); Reintroduce;  //重新发布
     procedure CloseServer; Reintroduce;  //重新发布
     //--------------------------------------------------------------------------
   public
     function InitialUdpTransfers(sLocalIP: String; const iLocalPort: Word = 0):Boolean;
     procedure Connect(sHost: String; iPort: Word; Const bPull: Boolean = False);
-    procedure SendSimple(var buf;bufSize:Word);
+    procedure SendSimple(var buf;bufSize:Word);overload;
+    procedure SendSimple(sHost: String; iPort: Word; var buf;bufSize:Word);overload;
     procedure PullServer(sHost:String;iPort:Word);
     procedure CloseConnect; virtual;
   published
     property OnConnect: TNotifyEvent read FOnConnect write FOnConnect;
     property OnDisconnect: TNotifyEvent read FOnDisconnect write FOnDisconnect;
     property OnServerPull: TNotifyEvent read FOnServerPull write FOnServerPull;
+    property OnUDPSimpleRead:TUDPReadEvent Write FOnUDPSimpleRead;
     property LocalPort: Word Read GetLocalPort;
     property RemotePort: Word Read FRemotePort;
     property RemoteHost:String Read  FRemoteHost;
@@ -109,14 +109,12 @@ begin
   FreeUDataList := TThreadList.Create;
 
   FIdentifier:=GUIDTOSTRING(GETGUID); //唯一识别码
-  FIdentifier:=StringReplace(FIdentifier,'{','',[rfReplaceAll, rfIgnoreCase]);
+  FIdentifier:=copy(FIdentifier,2,36);
   FIdentifier:=StringReplace(FIdentifier,'-','',[rfReplaceAll, rfIgnoreCase]);
-  FIdentifier:=StringReplace(FIdentifier,'}','',[rfReplaceAll, rfIgnoreCase]);
 
   TmpTimer := TMultiTimer.Create;
   HeartBeatThread := TmpTimer.RegTimer(5000, HeartBeatCheck);
   OutHeartBeatThread := TmpTimer.RegTimer(1500, OutHeartBeatCheck);
-  OnProcessThread := TmpTimer.RegTimer(500, OnProcessCheck);  
 end;
 
 // ------------------------------------------------------------------------------
@@ -124,10 +122,10 @@ end;
 // ------------------------------------------------------------------------------
 destructor TUDPServer.Destroy;
 begin
+  if assigned(TmpTimer) then
+    freeandnil(TmpTimer);
   if FConnected then CloseConnect;
   if Active then CloseServer;
-  if assigned(TmpTimer) then
-    freeandnil(TmpTimer);  
   if assigned(FreeUDataList) then
     freeandnil(FreeUDataList);
   inherited Destroy;
@@ -138,9 +136,8 @@ end;
 // ------------------------------------------------------------------------------
 function TUDPServer.GetLocalPort: Word;
 begin
-  Result := FBinding.Port;
+  Result := FBinding.PeerPort;
 end;
-
 // ------------------------------------------------------------------------------
 // 申请一个新的数据包
 // ------------------------------------------------------------------------------
@@ -153,9 +150,7 @@ begin
       begin
         TmpData := Items[0];
         Delete(0);
-      end
-      else
-        New(TmpData);
+      end else New(TmpData);
     end;
   finally
     FreeUDataList.UnlockList;
@@ -205,12 +200,12 @@ begin
     end;
 end;
 
-procedure TUDPServer.SendBuffer(sHost:String;iPort:Word;var buf;bufSize:Word);
+procedure TUDPServer.SendSimple(var buf;bufSize:Word);
 begin
-  Inherited;
+  SendSimple(FDestHost, FDestPort,buf,bufSize);
 end;
 
-procedure TUDPServer.SendSimple(var buf;bufSize:Word);
+procedure TUDPServer.SendSimple(sHost:String;iPort:Word;var buf;bufSize:Word);
 var
   TmpData: PUDataPack;
 begin
@@ -220,7 +215,7 @@ begin
     TmpData^.DataHead.iAction := UD_Simple;
     TmpData^.DataHead.iLen:=bufSize;
     CopyMemory(@TmpData^.Data[0],@buf,bufSize);
-    SendUBuffer(TmpData);
+    SendUBuffer(TmpData,sHost,iPort);
   finally
     FreeUDataList.Add(TmpData);
   end;
@@ -238,10 +233,9 @@ begin
 
     CopyMemory(@TmpData^.DataHead,@buf,SizeOf(TUDataHead));
     CopyMemory(@TmpData^.Data[0],Pointer(Integer(@buf)+SizeOf(TUDataHead)),TmpData^.DataHead.iLen);
-
      //正在接收和发送数据块时重置心跳激活时钟
     if FConnected then
-    if TmpData^.DataHead.iAction in [UD_Send,UD_Recv] then
+    if TmpData^.DataHead.iAction in [UD_Start,UD_Block,UD_Send,UD_Recv,UD_SendOver,UD_RecvOver] then
       TmpTimer.ActiveTime(HeartBeatThread);
           
     case TmpData^.DataHead.iAction of
@@ -263,7 +257,7 @@ begin
         ResponseProcess(TmpData); // 心跳响应
       // --------------------------------------------------------------------------
       UD_Simple:
-        RecvSimpleProcess(TmpData); //处理简单数据包过程
+        RecvSimpleProcess(TmpData,ABinding); //处理简单数据包过程
 
       else UDPServerOnUDPRead(TmpData); //交给子类处理
     end;
@@ -278,16 +272,11 @@ begin
 //
 end;
 
-procedure TUDPServer.OnProcessCheck(Sendder: TObject);
-begin
-//
-end;
-
 //处理简单数据包
-procedure TUDPServer.RecvSimpleProcess(TmpData: PUDataPack);
+procedure TUDPServer.RecvSimpleProcess(TmpData: PUDataPack; ABinding: TSocketHandle);
 begin
-  if assigned(FOnUDPRead) then
-    FOnUDPRead(nil,TmpData.Data,TmpData.DataHead.iLen,FBinding);
+  if assigned(FOnUDPSimpleRead) then
+    FOnUDPSimpleRead(nil,TmpData.Data,TmpData.DataHead.iLen,ABinding);
 end;
 
 // ------------------------------------------------------------------------------
@@ -308,10 +297,10 @@ end;
 // ------------------------------------------------------------------------------
 procedure TUDPServer.OutHeartBeatCheck(Sender: TObject);
 begin
-  inc(PSingleTime(Sender).iCount);
-  if PSingleTime(Sender).iCount <3 then
+  inc(PSingleTime(OutHeartBeatThread).iCount);
+  if PSingleTime(OutHeartBeatThread).iCount <3 then
     begin
-    TmpTimer.ActiveTime(OutHeartBeatThread);
+    TmpTimer.ActiveTime(HeartBeatThread, False);
     SendUBuffer(UD_Heartbeat);
     end else CloseConnect;
 end;
@@ -333,7 +322,7 @@ end;
 // ------------------------------------------------------------------------------
 procedure TUDPServer.ResponseProcess(TmpData: PUDataPack);
 begin
-  PSingleTime(OutHeartBeatThread).iCount:=0;
+  TmpTimer.ActiveTime(HeartBeatThread);
   TmpTimer.ActiveTime(OutHeartBeatThread, False);
 end;
 
@@ -354,8 +343,8 @@ var
   iPort:Word;
   iLen:Byte;
 begin
-  sHost := ABinding.IP;
-  iPort := ABinding.Port;
+  sHost := ABinding.PeerIP;
+  iPort := ABinding.PeerPort;
 
   TmpData^.DataHead.iAction := UD_Pull_Response;
 
@@ -385,8 +374,8 @@ end;
 // ------------------------------------------------------------------------------
 procedure TUDPServer.HandshakeFirstlyProcess(TmpData: PUDataPack; ABinding: TSocketHandle);
 begin
-  FDestHost := ABinding.IP;
-  FDestPort := ABinding.Port;
+  FDestHost := ABinding.PeerIP;
+  FDestPort := ABinding.PeerPort;
   TmpData^.DataHead.iAction := UD_Handshake_Secondly;
   SendUBuffer(TmpData,FDestHost,FDestPort);
 end;
@@ -397,7 +386,6 @@ end;
 procedure TUDPServer.HandshakeSecondlyProcess(TmpData: PUDataPack);
 begin
   TmpTimer.ActiveTime(HeartBeatThread);
-  TmpTimer.ActiveTime(OnProcessThread);
   FConnected := True;  
   TmpData^.DataHead.iAction := UD_Handshake_Thirdly;
   SendUBuffer(TmpData);
@@ -410,7 +398,6 @@ end;
 procedure TUDPServer.HandshakeThirdlyProcess(TmpData: PUDataPack);
 begin
   TmpTimer.ActiveTime(HeartBeatThread);
-  TmpTimer.ActiveTime(OnProcessThread);
   FConnected := True;
   if assigned(FonConnect) then FonConnect(self);
 end;
@@ -453,7 +440,6 @@ begin
     begin
     TmpTimer.ActiveTime(OutHeartBeatThread, False);
     TmpTimer.ActiveTime(HeartBeatThread, False);
-    TmpTimer.ActiveTime(OnProcessThread, False);    
     if assigned(FonDisconnect) then
       FonDisconnect(self);
     end;
@@ -462,6 +448,7 @@ end;
 
 procedure TUDPServer.CloseServer; 
 begin
+  CloseConnect;
   Inherited;
 end;
 

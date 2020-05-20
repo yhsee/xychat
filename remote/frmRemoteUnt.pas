@@ -27,7 +27,7 @@ type
 
     FUserClipText,
     FUserSign:String;
-
+    RemoteEvent:Pointer;
     FUDPRemote:TUDPStream;
     frmRemoteClient:TfrmRemoteClient;
 
@@ -72,7 +72,7 @@ begin
   udpcore.desksource.CaptureEvent:=CaptureScreen;
 
   FUDPRemote:=TUDPStream.Create;
-  FUDPRemote.OnUDPRead:=UDPRemoteOnRecvBuffer;
+  FUDPRemote.OnUDPSimpleRead:=UDPRemoteOnRecvBuffer;
   FUDPRemote.onDisconnect:=UDPRemoteOnDisconnect;
   FUDPRemote.OnUDPSendComplete:=UDPRemoteOnSendComplete;
   FUDPRemote.OnUDPRecvComplete:=UDPRemoteOnRecvComplete;
@@ -131,7 +131,7 @@ begin
     end;
   CloseTrans;
   if assigned(frmRemoteClient) then freeandnil(frmRemoteClient);
-  Event.RemoveEventProcess(Event_Remote,FUserSign);
+  Event.RemoveEventProcess(RemoteEvent);
   inherited;
 end;
 
@@ -144,7 +144,7 @@ begin
   FUserSign:=sUserSign;
   if not user.Find(LoginUserSign,MyInfor) then exit;
   if not user.Find(FUserSign,TmpInfor) then exit;
-  Event.CreateEventProcess(EventProcess,Event_Remote,FUserSign);
+  RemoteEvent:=Event.CreateEventProcess(EventProcess,Event_Remote,FUserSign);
 
   Lab_Info.Caption:=Format('好友 %s 请求您进行远程协助，您确认接受吗？',[TmpInfor.UName]);
   if FServer then
@@ -162,6 +162,7 @@ end;
 
 procedure TfrmRemote.EventProcess(Sender:TObject;TmpEvent:TEventData);
 begin
+  Application.ProcessMessages;
   case TmpEvent.iEvent of
   //------------------------------------------------------------------------------
   // 刷新要改变状态的用户

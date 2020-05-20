@@ -22,23 +22,22 @@ type
   private
     FReserve:String;  //保留字串
     FCTmpFileName:WideString; //断点临时文件
-    FSpeedState:Byte;  //0 慢启动  1 拥塞控制 2 稳定状态
+    FSpeedState:Byte;  //0 慢启动  1 拥塞控制
 
     iSCompleteBlock, // 已经完成的块数量
     iRCompleteBlock, // 已经完成的块数量
     iRTmpComplete, // 单位时间内完成量用来核算速度
     iSTmpComplete:LongWord;  // 单位时间内完成量用来核算速度
 
-    iDefOutTime, // 默认超时时间
+    iLastCompleteDt,// 上一次完成时间
     iCurWindowSize,//当前确认的滑窗
-    iDefWindowSize,//滑窗上限
-
     iWindowSize,   //当前滑窗大小
     iBlockSize: Word; // 块尺寸大小
-    
+
     FSendBlock,                 //发送块状态
     FRecvBlock: Array of Byte; // 接收块状态
 
+    OnProcessThread,         //速度，进度，时钟    
     RecvOutTimeThread: Pointer; //接收超时时钟
 
     ThreadReviceStream,           //接收流
@@ -52,6 +51,7 @@ type
     
     procedure InitSendBlock(iSize: Int64);
     procedure InitRecvBlock(iSize: Int64);
+    function  LastUnRecvBlock:LongWord;
     procedure BlockProcess(TmpData: PUDataPack);
     procedure RequestProcess(iNumber:LongWord);
     procedure StartProcess(TmpData: PUDataPack);
@@ -72,7 +72,7 @@ type
     FOnUDPRecvTranEvent: TUDPTranEvent;
     //--------------------------------------------------------------------------
     procedure UDPServerOnUDPRead(TmpData: PUDataPack);override;
-    procedure OnProcessCheck(Sendder: TObject); override;    
+    procedure OnProcessCheck(Sendder: TObject);
   public
     procedure CloseConnect; override;
     function SendStream(TmpStream: TStream;Const sReserve:String=''):Boolean;
@@ -100,7 +100,8 @@ constructor TUDPStream.Create;
 begin
   inherited Create;
   iBlockSize := 1024-40;
-  RecvOutTimeThread := TmpTimer.RegTimer(500, RecvOutTimeCheck);
+  RecvOutTimeThread := TmpTimer.RegTimer(300, RecvOutTimeCheck);
+  OnProcessThread := TmpTimer.RegTimer(500, OnProcessCheck);
 end;
 
 // ------------------------------------------------------------------------------
@@ -163,7 +164,7 @@ begin
     FOnSendProcessEvent(nil,iSCompleteBlock div m ,High(FSendBlock) div m,iSTmpComplete * iBlockSize * 2);
 
   if assigned(FOnRecvProcessEvent) then
-    FOnRecvProcessEvent(nil,iRCompleteBlock div n ,High(FRecvBlock) div n, iRTmpComplete * iBlockSize * 2); 
+    FOnRecvProcessEvent(nil,iRCompleteBlock div n ,High(FRecvBlock) div n, iRTmpComplete * iBlockSize * 2);
 
   iRTmpComplete := 0;
   iSTmpComplete := 0;
@@ -174,6 +175,7 @@ end;
 // ------------------------------------------------------------------------------
 procedure TUDPStream.SendOverProcess(TmpData: PUDataPack);
 begin
+  TmpTimer.ActiveTime(OnProcessThread, False);
   SendUBuffer(UD_RecvOver);
   if assigned(ThreadSendStream) then
     begin
@@ -182,6 +184,7 @@ begin
       freeandnil(ThreadSendStream);
       ThreadSendStream:=nil;
       end else TMemoryStream(ThreadSendStream).SetSize(0);
+      
     if assigned(FOnUDPSendComplete) then
       FOnUDPSendComplete(self);
     end;
@@ -193,6 +196,7 @@ end;
 // ------------------------------------------------------------------------------
 procedure TUDPStream.RecvOverProcess(TmpData: PUDataPack);
 begin
+  TmpTimer.ActiveTime(OnProcessThread, False);
   TmpTimer.ActiveTime(RecvOutTimeThread,False);
   if Assigned(TranBreakPoint) then
     begin
@@ -201,17 +205,14 @@ begin
     end;
   if assigned(ThreadReviceStream) then
     begin
-    if ThreadReviceStream is TMemoryStream then  //文件流与内存流检查
+    if not (ThreadReviceStream is TMemoryStream) then
       begin
-      if assigned(FOnUDPRecvComplete) then
-        FOnUDPRecvComplete(self, ThreadReviceStream);
-      TMemoryStream(ThreadReviceStream).SetSize(0);
-      end else begin
       freeandnil(ThreadReviceStream);
       ThreadReviceStream:=nil;
-      if assigned(FOnUDPRecvComplete) then
-        FOnUDPRecvComplete(self, ThreadReviceStream);
-      end;
+      end else TMemoryStream(ThreadReviceStream).SetSize(0);
+
+    if assigned(FOnUDPRecvComplete) then
+      FOnUDPRecvComplete(self, ThreadReviceStream);
     end;
 end;
 
@@ -223,14 +224,13 @@ var
   TmpData: PUDataPack;
 begin
   try
-    PSingleTime(RecvOutTimeThread).iTime:=iDefOutTime;
     TmpTimer.ActiveTime(RecvOutTimeThread);
 
     NewUDataPack(TmpData);
     TmpData^.DataHead.iAction := UD_Start;
-    TmpData^.DataHead.iLen:=5;
-    TmpData^.Data[0]:=iWindowSize; //窗口尺寸
-    CopyMemory(@TmpData^.Data[1],@iNumber,4);
+    TmpData^.DataHead.iLen:=6;
+    CopyMemory(@TmpData^.Data[0],@iWindowSize,2);  //窗口尺寸
+    CopyMemory(@TmpData^.Data[2],@iNumber,4);
     SendUBuffer(TmpData);
   finally
     FreeUDataList.Add(TmpData);
@@ -242,15 +242,14 @@ end;
 // ------------------------------------------------------------------------------
 procedure TUDPStream.StartProcess(TmpData: PUDataPack);
 var
-  iSize:Word;
+  iNumber,iDegree,iSize:Word;
   iCurBlock:LongWord;
-  iNumber,iDegree: Byte;
   TmpDataEx: PUDataPack;
 begin
   if not Connected then exit; //连接断开退出数据发送
 
-  iDegree:=TmpData^.Data[0];
-  CopyMemory(@iCurBlock,@TmpData^.Data[1],4);
+  CopyMemory(@iDegree,@TmpData^.Data[0],2);
+  CopyMemory(@iCurBlock,@TmpData^.Data[2],4);
   if (iSCompleteBlock=0) and (iCurBlock>0) then
     iSCompleteBlock:=iCurBlock;
 
@@ -336,38 +335,9 @@ begin
   // --------------------------------------------------------------------------
   if (iRCompleteBlock = LongWord(High(FRecvBlock)) + 1) then
     begin
-    PSingleTime(RecvOutTimeThread).iTime:=iDefOutTime;
     TmpTimer.ActiveTime(RecvOutTimeThread);
     SendUBuffer(UD_SendOver);
     end else AdjustSlowWindow;
-end;
-
-// ------------------------------------------------------------------------------
-// 窗口慢启动控制
-// ------------------------------------------------------------------------------
-procedure TUDPStream.AdjustSlowWindow;
-begin
-  if iCurWindowSize=iWindowSize then  //本次窗口数据结束
-    begin
-    iCurWindowSize:=0;
-    case FSpeedState of
-      0:begin //慢启动状态
-        if iWindowSize<iDefWindowSize then
-          iWindowSize:=Min(iWindowSize*2,iDefWindowSize)
-          else FSpeedState:=1;//进入拥塞控制
-        end;
-
-      1:begin //拥塞控制
-        if iWindowSize<Max_WindowSize then
-          inc(iWindowSize);
-        end;
-
-      2:begin //稳定传输状态
-
-        end;
-      end;
-    RequestProcess(iRCompleteBlock);
-    end;
 end;
 
 // ------------------------------------------------------------------------------
@@ -380,13 +350,47 @@ begin
   if not Connected then exit; //连接断开退出
 
   CopyMemory(@iNumber,@TmpData^.Data[0],4);
-  if iNumber > LongWord(High(FSendBlock)) then exit;
+  if iNumber > LongWord(High(FSendBlock)) then
+    begin
+    WriteLogEvent(nil,0,Format('send ok Out %d %d',[iNumber,LongWord(High(FSendBlock))]));
+    exit;
+    end;
 
   if FSendBlock[iNumber] in [Block_Sending,Block_Pause] then
     begin
     inc(iSTmpComplete);
     inc(iSCompleteBlock);
     FSendBlock[iNumber]:=Block_Complete;
+    end;
+end;
+
+
+// ------------------------------------------------------------------------------
+// 窗口慢启动控制
+// ------------------------------------------------------------------------------
+procedure TUDPStream.AdjustSlowWindow;
+var
+  iCompleteDt:LongWord;
+begin
+  if iCurWindowSize=iWindowSize then  //本次窗口数据结束
+    begin
+    iCompleteDt:=GetTickCount-PSingleTime(RecvOutTimeThread).iStartTick;
+    iCurWindowSize:=0;
+    case FSpeedState of
+      0:begin //慢启动乘法
+        iWindowSize:=iWindowSize*2;
+        end;
+
+      1:begin //慢启动加法
+        inc(iWindowSize);
+        end;
+
+      2:begin //拥塞控制
+        if (iCompleteDt+100)<iLastCompleteDt then FSpeedState:=1;
+        iLastCompleteDt:=iCompleteDt;        
+        end;
+      end;
+    RequestProcess(iRCompleteBlock);
     end;
 end;
 
@@ -397,33 +401,46 @@ procedure TUDPStream.RecvOutTimeCheck(Sender: TObject);
 var
   iOutBlock: LongWord;
 begin
+  if not Connected then exit; //连接断开退出
   iCurWindowSize:=0;
-  if (iRCompleteBlock <> LongWord(High(FRecvBlock)) + 1) then //任务未完成
+  if (iRCompleteBlock < LongWord(High(FRecvBlock)) + 1) then //任务未完成
     begin
-    iOutBlock:=iRCompleteBlock-iWindowSize;
+    iOutBlock:=LastUnRecvBlock;
     case FSpeedState of
-      0:begin //慢启动过程中发生丢包
-        iWindowSize:=Max(2,iWindowSize div 2);
-        FSpeedState:=1; //转入拥塞避免
+      0:begin //慢启动乘法过程中发生丢包
+        iWindowSize:=Max(1,iWindowSize div 2);
+        FSpeedState:=1; //慢启动加法
         end;
 
-      1:begin //拥塞避免过程中发生丢包
-        inc(iWindowSize,-2);
-        FSpeedState:=2; //转入稳定状态
+      1:begin //慢启动加法过程中发生丢包
+        iWindowSize:=Max(1,iWindowSize div 2);
+        iLastCompleteDt:=0;
+        FSpeedState:=2; //拥塞控制
         end;
 
-      2:begin //稳定状态过程中发生丢包
-        iDefOutTime:=Min(1500,iDefOutTime+500);
-        iDefWindowSize:=Max(2,iWindowSize div 2);
-        iWindowSize:=1;
-        FSpeedState:=0;
+      2:begin //拥塞控制过程中发生丢包
+        iWindowSize:=Max(1,iWindowSize-2);
         end;
       end;
     RequestProcess(iOutBlock);
     end else begin
-    PSingleTime(RecvOutTimeThread).iTime:=iDefOutTime;
     TmpTimer.ActiveTime(RecvOutTimeThread);
     SendUBuffer(UD_SendOver);
+    end;
+end;
+
+function  TUDPStream.LastUnRecvBlock:LongWord;
+var
+  i:Integer;
+begin
+  Result:=iRCompleteBlock;
+  for i:=iRCompleteBlock-iWindowSize to iRCompleteBlock do
+    begin
+    if FRecvBlock[i]=Block_Ready then
+      begin
+      Result:=i;
+      break;
+      end;
     end;
 end;
 
@@ -443,6 +460,7 @@ begin
   FSendBlock := nil;
   SetLength(FSendBlock, iLength);
   FillMemory(@FSendBlock[0],iLength,Block_Ready);
+  TmpTimer.ActiveTime(OnProcessThread);
 end;
 
 // ------------------------------------------------------------------------------
@@ -453,11 +471,10 @@ var
   iLength: LongWord;
 begin
   iRCompleteBlock := 0;
-  iDefOutTime:=500;
 
   iWindowSize:=1;
   iCurWindowSize:=0;
-  iDefWindowSize:=Max_WindowSize;
+  iLastCompleteDt:=0;
   FSpeedState:=0;
 
   iLength := iSize div iBlockSize;
@@ -466,6 +483,7 @@ begin
   FRecvBlock := nil;
   SetLength(FRecvBlock, iLength);
   FillMemory(@FRecvBlock[0],iLength,Block_Ready);
+  TmpTimer.ActiveTime(OnProcessThread);
 end;
 
 // ------------------------------------------------------------------------------
@@ -489,7 +507,7 @@ begin
   sTmpStr:=UTF8Encode(ConCat(sReserve,WideExtractFileName(sFileName)));
 
   ThreadSendStream.Seek(0, 0);
-  
+
   Result:=SendUDPStream(sTmpStr);
   except
   Result:=False;
@@ -613,6 +631,7 @@ procedure TUDPStream.BlockProcess(TmpData: PUDataPack);
 var
   iLen: Word;
   iSize: Int64;
+  sNewFileName:WideString;
 begin
   if (iRCompleteBlock = LongWord(High(FRecvBlock)) + 1) then RecvOverProcess(nil);
 
@@ -632,7 +651,8 @@ begin
     end else begin
     if assigned(ThreadReviceStream) then freeandnil(ThreadReviceStream);
     if Assigned(TranBreakPoint) then freeandnil(TranBreakPoint);
-    FOnUDPRecvReady(nil,ThreadReviceStream,iSize);
+    FOnUDPRecvReady(nil,sNewFileName,iSize);
+    ThreadReviceStream:=TTntFileStream.Create(sNewFileName,fmCreate or fmOpenWrite);
     end;
   //发起请求第一个数据包.
   if iSize>0 then
@@ -641,3 +661,5 @@ begin
 end;
 
 end.
+
+

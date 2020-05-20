@@ -28,6 +28,7 @@ type
     procedure eventsMessage(var Msg: tagMSG; var Handled: Boolean);
   private
     { Private declarations }
+    ClientRun:Boolean;
     FUDPServer: TUDPBase;
     analyzerThread:TanalyzerThread;
 //------------------------------------------------------------------------------
@@ -38,13 +39,13 @@ type
     procedure CreateUserPath;
 //------------------------------------------------------------------------------
     function GetFileList(var TmpList:TTntStringList):Boolean;
-    procedure SearchFileList(sFileList:WideString;var TmpList:TTntStringList);
     function GetFilelistSumSize(TmpList:TTntStringList;var sPath:WideString):int64;
 //------------------------------------------------------------------------------
     procedure EventProcess(Sender:TObject;TmpEvent:TEventData);
 //------------------------------------------------------------------------------
     procedure FirendStatusProcess(iOperation:Integer);
   public
+    UDPCoreEvent:Pointer;
     SysHotKey: TSysHotKey;
     desksource:Tdesksource;
     VideoDirectShow:TVideoDirectShow;
@@ -63,7 +64,6 @@ type
     procedure SendServertransfer(Params:WideString;sUserSign:String);
     procedure SendfinderBroadcast(sHost:String);overload;
     procedure SendfinderBroadcast;overload;
-    procedure FinderFirend(sHost:String);
 //------------------------------------------------------------------------------
     procedure UserLoginStatus;
     procedure UserOutStatus;
@@ -78,7 +78,7 @@ type
     procedure createhisform;overload;
 //------------------------------------------------------------------------------
     procedure sendmutilfile(sUserSign:String);
-    procedure SendDropFile(sUserSign:String;sFileList:WideString);
+    procedure SendDropFile(sUserSign:String;sFileList:Widestring);
     procedure Createfiletranfrom(sUserSign:String;Params:WideString);overload;
     procedure createfiletranfrom(Params:WideString);overload;
 //------------------------------------------------------------------------------
@@ -175,16 +175,18 @@ begin
   ImageOle:=TImageOle.create;
   desksource:=Tdesksource.Create;
   FUDPServer := TUDPBase.Create;
-  FUDPServer.OnUDPRead := UDPServerOnUDPRead;
+  FUDPServer.OnUDPBaseRead := UDPServerOnUDPRead;
 
   Event:=TEvent.Create(self);
-  Event.CreateEventProcess(EventProcess,Event_Core);
+  UDPCoreEvent:=Event.CreateEventProcess(EventProcess,Event_Core);
+  Event.Status:=ClientRun;
 
   SysHotKey := TSysHotKey.Create(Self);
   SysHotKey.OnHotKey := SysHotKeyHotKey;
 
   VideoDirectShow:=TVideoDirectShow.Create;
   analyzerThread:=TanalyzerThread.Create(self);
+  analyzerThread.Status:=ClientRun;
 
   readxml;
   initclient;
@@ -214,6 +216,7 @@ procedure Tudpcore.EventProcess(Sender:TObject;TmpEvent:TEventData);
 var
   TmpInfor:TFirendInfo;
 begin
+  Application.ProcessMessages;
   case TmpEvent.iEvent of
 
   //------------------------------------------------------------------------------
@@ -290,8 +293,9 @@ end;
 procedure Tudpcore.DataModuleDestory(Sender: TObject);
 begin
   ClientRun:=False;
-  Event.RemoveEventProcess(Event_Core);
-  while GetRawDataCount>0 do sleep(100);
+  Event.Status:=ClientRun;
+  analyzerThread.Status:=ClientRun;
+  Event.RemoveEventProcess(UDPCoreEvent);
   if assigned(Event)then freeandnil(Event);
   if Assigned(SysHotKey) then FreeAndNil(SysHotKey);
   if Assigned(desksource) then FreeAndNil(desksource);
@@ -307,23 +311,6 @@ begin
 end;
 
 //------------------------------------------------------------------------------
-//  响应用户的探测
-//------------------------------------------------------------------------------
-procedure Tudpcore.FinderFirend(sHost:String);
-var
-  TmpInfor:Tfirendinfo;
-  sParams:WideString;
-begin
-  if not User.Find(LoginUserSign,TmpInfor) then exit;
-  //回应用户的探测
-  AddValueToNote(sParams,'function',Firend_Function);
-  AddValueToNote(sParams,'operation',FinderResponses_Operation);
-  AddValueToNote(sParams,'UserSign',LoginUserSign);
-  AddValueToNote(sParams,'FirendInfor',TmpInfor,SizeOf(Tfirendinfo)-108);
-  SendServer(sParams,sHost);
-end;
-
-//------------------------------------------------------------------------------
 // 非同步线程 消息接收
 //------------------------------------------------------------------------------
 procedure Tudpcore.UDPServerOnUDPRead(Sender: TObject;var buf;bufSize:Word;ABinding: TSocketHandle);
@@ -332,25 +319,18 @@ var
 begin
   if not ClientRun then exit;
 
-  if bufSize=1 then
-    begin
-    FinderFirend(ABinding.IP);
-    exit;
+  if Assigned(analyzerThread) then
+    try
+    analyzerThread.NewRawData(TmpData);
+    TmpData.DataLen:=bufSize;
+    CopyMemory(@TmpData^.DataBuf[0],@buf,bufSize);
+    TmpData^.UserSocket.PeerIP:=ABinding.PeerIP;
+    TmpData^.UserSocket.PeerPort:=ABinding.PeerPort;
+
+    analyzerThread.AddRawDataList(TmpData);
+    except
+    analyzerThread.AddFreeDataList(TmpData);
     end;
-
-  try
-  NewRawData(Pointer(TmpData));
-  FillMemory(TmpData,SizeOf(TRawData),0);
-
-  CopyMemory(@TmpData^.DataHead,Pointer(Integer(@buf)),SizeOf(TDataHead));
-  CopyMemory(@TmpData^.DataBuf[0],Pointer(Integer(@buf)+SizeOf(TDataHead)),TmpData^.DataHead.DataLen);
-  TmpData^.UserSocket.PeerIP:=ABinding.IP;
-  TmpData^.UserSocket.PeerPort:=ABinding.Port;
-
-  RawDataList.Add(TmpData);
-  except
-  FreeDataList.Add(TmpData);
-  end;
 end;
 
 //------------------------------------------------------------------------------
@@ -373,15 +353,13 @@ end;
 procedure tudpcore.SendfinderBroadcast(sHost:String);
 var
   i:Integer;
-  iFlag:Byte;
+  sParams:WideString;
 begin
-  iFlag:=255;
+  AddValueToNote(sParams,'function',Firend_Function);
+  AddValueToNote(sParams,'operation',FinderBroadCast_Operation);
   for i:=1 to 254 do
-  if FUDPServer.Active then
-    begin
-    if not ClientRun then exit;
-    FUDPServer.SendBuffer(ConCat(sHost,'.',IntToStr(i)),Core_Port,iFlag,1);
-    end;
+  if ClientRun and FUDPServer.Active then
+    sendServer(sParams,Format('%s.%d',[sHost,i]));
 end;
 
 //------------------------------------------------------------------------------
@@ -417,26 +395,13 @@ end;
 //------------------------------------------------------------------------------
 procedure tudpcore.sendServer(Params:WideString;sHost:String);
 var
-  iLen:Integer;
   sParams:String;
-  TmpData:PRawData;
 begin
-  if not ClientRun then exit;
-  if FUDPServer.Active then
-    Try
-    NewRawData(Pointer(TmpData));
-    InitialDataPack(TmpData);
-
+  if ClientRun and FUDPServer.Active then
+    begin
     sParams:=UTF8Encode(Params);
-    TmpData^.DataHead.DataLen:=Length(sParams);
-    CopyMemory(@TmpData^.DataBuf[0],@sParams[1],TmpData^.DataHead.DataLen);
-
-    iLen:=TmpData^.DataHead.DataLen+SizeOf(TDataHead);
-
-    FUDPServer.SendBuffer(sHost,Core_Port,TmpData^,iLen);
+    FUDPServer.SendBuffer(sHost,Core_Port,sParams[1],Length(sParams));
     Sleep(10);
-    finally
-    FreeDataList.Add(TmpData);
     end;
 end;
 
@@ -553,45 +518,17 @@ begin
 end;
 
 //------------------------------------------------------------------------------
-// 获取文件列表
-//------------------------------------------------------------------------------
-procedure Tudpcore.SearchFileList(sFileList:WideString;var TmpList:TTntStringList);
-var
-  i:Integer;
-  sTmpStr:WideString;
-begin
-  with TTntStringList.Create do
-  try
-    Text := sFileList;
-    if Count>0 then
-    for i:=1 to count do
-      begin
-      sTmpStr:=Strings[i-1];
-      if (WideFileGetAttr(sTmpStr) and faDirectory)<>0 then
-        begin
-        Fixdirectory(sTmpStr);
-        {if Trim(sTmpStr)='' then
-          sTmpStr := FixDirectoryEx(sTmpStr);  }
-        FindFile(sTmpStr+'*.*', Tmplist, True);
-        end else Tmplist.Add(sTmpStr);
-      end;
-  finally
-    Free;
-  end;
-end;
-
-//------------------------------------------------------------------------------
 // 发送拖放过来的文件和目录
 //------------------------------------------------------------------------------
-procedure Tudpcore.SendDropFile(sUserSign:String;sFileList:WideString);
+procedure Tudpcore.SendDropFile(sUserSign:String;sFileList:Widestring);
 var
   iSize:Int64;
   sPath,sParams:WideString;
   TmpList:TTntStringlist;
 begin
   try
-    TmpList := TTntStringList.Create;
-    SearchFileList(sFileList,TmpList);
+    TmpList:=TTntStringlist.Create;
+    TmpList.Text:=sFileList;
     if Tmplist.Count>0 then
       begin
       iSize:=GetFilelistSumSize(TmpList,sPath);
@@ -633,7 +570,6 @@ begin
   try
     TmpList:=TTntStringlist.Create;
     if GetFileList(TmpList) then
-    if TmpList.Count>0 then
       SendDropFile(sUserSign,TmpList.Text);
   finally
     Freeandnil(TmpList);

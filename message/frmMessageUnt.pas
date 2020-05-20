@@ -53,6 +53,7 @@ type
     FAllowSendKey,
     JustInput:boolean;
     downpicture:Tdownpic;
+    MessageEvent:Pointer;
     procedure EventProcess(Sender:TObject;TmpEvent:TEventData);
     procedure addmsgtomemo(isme:boolean;dt:tdatetime;firendname:WideString;msg:Widestring;TmpFontFormat:TFontFormat);
     procedure PopupAtCursor(popupmenu:tpopupmenu);
@@ -209,7 +210,7 @@ begin
   downpicture.InitialComplete(FUserSign);
   downpicture.OnRequest:=downpicrequest;
   downpicture.OnComplete:=downpicclientcomplete;
-  event.CreateEventProcess(EventProcess,Event_Dialog,FUserSign);
+  MessageEvent:=event.CreateEventProcess(EventProcess,Event_Dialog,FUserSign);
 end;
 
 procedure TfrmMessage.showfirendinfo(Request,downpic:boolean);
@@ -362,6 +363,7 @@ end;
 //------------------------------------------------------------------------------
 procedure TfrmMessage.EventProcess(Sender:TObject;TmpEvent:TEventData);
 begin
+  Application.ProcessMessages;
   case TmpEvent.iEvent of
 
     Close_Form_Event:close;
@@ -940,7 +942,7 @@ end;
 
 procedure TfrmMessage.FormDestroy(Sender: TObject);
 begin
-  event.RemoveEventProcess(Event_Dialog,FUserSign);
+  event.RemoveEventProcess(MessageEvent);
   inherited;  
 end;
 

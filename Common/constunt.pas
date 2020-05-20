@@ -92,7 +92,7 @@ Resourcestring
   MSGBOX_TYPE_WARAING = '警告';
   MSGBOX_TYPE_CONFIG = '确认';
 
-  TRAYICON_INFO = '奕信 2012 - %s(%s)';
+  TRAYICON_INFO = '絮语 2012 - %s(%s)';
   TRAYICON_INFO_ADMIN = '在线管理员';
 
   MSGBOX_INFORMATION_REGINFONONPASS = '您填写的注册资料不完整，星号标记的项目必须填写。';

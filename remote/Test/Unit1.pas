@@ -51,7 +51,6 @@ begin
   TmpSource.CaptureEvent:=CaptureOnEvent;
   TmpSource.CaptureStart;
   TmpSource.Capture;
-
   //进入剪贴板 事件链
   FClipView:=SetClipboardViewer(handle);
 end;
@@ -72,7 +71,6 @@ begin
     Canvas.Unlock;
     end
   finally
-  TmpSource.Capture;
   freeandnil(TmpBitmap);
   end;
 end;

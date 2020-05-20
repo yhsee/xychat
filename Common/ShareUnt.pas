@@ -47,7 +47,7 @@ var
   showonline,                           //只显示在线用户
   showupdownhint,                       //显示上下线提示
 
-  ClientRun,
+
   allow_application_quit                 //用户退出
 
   :boolean;

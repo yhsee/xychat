@@ -9,9 +9,9 @@ uses
 {$R *.RES}
 
 begin
-  if FindWindowW('TApplication','ﬁ»–≈ 2012')>0 then exit;
+  if FindWindowW('TApplication','–ı”Ô 2012')>0 then exit;
   Application.Initialize;
-  Application.Title := 'ﬁ»–≈ 2012';
+  Application.Title := '–ı”Ô 2012';
   Application.CreateForm(Tudpcore, udpcore);
   Application.CreateForm(TMainForm, MainForm);
   Application.Run;

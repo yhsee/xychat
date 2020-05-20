@@ -6,12 +6,8 @@ unit EventCommonUnt;
 
 interface
 
-uses
-  SysUtils,Classes;
-
 
 const
-  Buffer_Count                               =1024;
 //------------------------------------------------------------------------------
 //  事件定义
 //------------------------------------------------------------------------------
@@ -54,6 +50,8 @@ const
   File_Refuse_Event                          =10074;
   File_Cancel_Event                          =10075;
   File_Complete_Event                        =10076;
+  File_UpdateInfor_Event                     =10077;
+  File_UpdateProcess_Event                   =10078;
 
   Remote_Request_Event                       =10081;
   Remote_Accept_Event                        =10082;
@@ -80,117 +78,13 @@ type
   PEventProcess=^TEventProcess;
   TEventProcess=Packed Record
     iType:TEventType;
+    iDelete:Boolean;
     UserSign:String[32];
     OnEvent:TOnEventProcess;
     end;
 
-//------------------------------------------------------------------------------
-// 事件缓冲区
-//------------------------------------------------------------------------------
-var
-  EventList,
-  EvenDatatList,
-  FreeEventList:TThreadList;
-
-function GetEventRawDataCount:integer;
-function GetOneEventRawData(var TmpData:Pointer):boolean;
-procedure NewEventRawData(var TmpData:Pointer);
-procedure AppendEventRawData(TmpData:Pointer);
 
 implementation
 
-//------------------------------------------------------------------------------
-// 缓冲区队列操作
-//------------------------------------------------------------------------------
-procedure NewEventRawData(var TmpData:Pointer);
-begin
-  try
-  with FreeEventList.LockList do
-    begin
-    if Count>0 then
-      begin
-      TmpData:=Items[0];
-      delete(0);
-      end else begin
-        New(PEventData(TmpData));
-      end;
-    end;
-  finally
-  FreeEventList.UnlockList;
-  end;
-end;
-
-procedure AppendEventRawData(TmpData:Pointer);
-begin
-  try
-  with EvenDatatList.LockList do
-    begin
-    if Count>Buffer_Count then
-      begin
-      Dispose(Items[0]);
-      delete(0);
-      end;
-    add(TmpData);
-    end;
-  finally
-  EvenDatatList.UnlockList;
-  end;
-end;
-
-function GetOneEventRawData(var TmpData:Pointer):boolean;
-begin
-  try
-  with EvenDatatList.LockList do
-    begin
-    result:=false;
-    if Count>0 then
-      begin
-      TmpData:=Items[0];
-      delete(0);
-      result:=true;
-      end;
-    end;
-  finally
-  EvenDatatList.UnlockList;
-  end;
-end;
-
-function GetEventRawDataCount:integer;
-begin
-  try
-  with EvenDatatList.LockList do
-    Result:=Count;
-  finally
-  EvenDatatList.UnlockList;
-  end;
-end;
-
-procedure DestoryList(TmpList:TThreadList);
-var i:integer;
-begin
-try
-with TmpList.LockList do
-  for i:=Count downto 1 do
-   begin
-   Dispose(Items[i-1]);
-   delete(i-1);
-   end;
-finally
-TmpList.UnlockList;
-end;
-end;
-
-initialization
-  EvenDatatList:=TThreadList.Create;
-  FreeEventList:=TThreadList.Create;
-  EventList:=TThreadlist.Create;
-
-finalization
-  DestoryList(EvenDatatList);
-  freeandnil(EvenDatatList);
-  DestoryList(FreeEventList);
-  freeandnil(FreeEventList);
-  DestoryList(EventList);
-  freeandnil(EventList);
 
 end.

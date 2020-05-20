@@ -4,7 +4,7 @@ interface
 
 uses
   Windows, Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
-  Dialogs, ConstUnt, SunFlashCtl,PanelEx,
+  Dialogs, ConstUnt,PanelEx,
   {Tnt Control}
   TntWindows, TntSysUtils, TntClasses, TntForms, TntStdCtrls, TntComCtrls,
   TntGraphics, ExtCtrls, ActnList, jpeg, StdCtrls, ImgList, Menus, TntMenus,
@@ -46,7 +46,6 @@ type
     procedure Image_SoundClick(Sender: TObject);
   private
     { Private declarations }
-    sfpVideo : TSunFlashPlayer;
     FOnMuteClick:TNotifyEvent;
     procedure EnterVideoBar(Sender: TObject);
     procedure LoadImgRes(ImgControl: TImage; swImage: WideString);overload;
@@ -54,8 +53,6 @@ type
     procedure LeaveVideoBar(Sender: TObject);
   public
     procedure InitializeBox;
-    procedure FInitializeBox;
-    procedure ControlFlash(bPlay:boolean);
     procedure ReLoadBackground;
     { Public declarations }
   published
@@ -72,10 +69,6 @@ implementation
 procedure TFrmVideoSound.InitializeBox;
 begin
   ReLoadBackground;
-  sfpVideo := TSunFlashPlayer.Create(Self);
-  sfpVideo.Parent := Panel_Video;
-  sfpVideo.Align := alClient;
-  sfpVideo.Visible := False;
 end;
 
 procedure TFrmVideoSound.ReLoadBackground;
@@ -83,31 +76,6 @@ begin
   LoadImgRes(Image_VideoBackupGroup, 'Dis040.jpg');
   LoadImgRes(Image_VideoBar, 'VideoBar01.jpg');
   LoadImgRes(Image_SmallVideoBackupGroup, 'Dis045.jpg');
-end;
-
-procedure TFrmVideoSound.FInitializeBox;
-begin
-  if Assigned(sfpVideo) then
-     begin
-     sfpVideo.StopPlay;
-     FreeAndNil(sfpVideo);
-     end;
-end;
-
-procedure TFrmVideoSound.ControlFlash(bPlay:boolean);
-begin
-if Assigned(sfpVideo) then
-   begin
-   if bPlay then
-      begin
-      sfpVideo.Visible := True;
-      sfpVideo.PlayFlash(':BIG');
-      sfpVideo.AutoResizeFlash;
-      end else begin
-      sfpVideo.StopPlay;
-      sfpVideo.Visible := False;
-      end;
-   end;
 end;
 
 procedure TFrmVideoSound.EnterVideoBar(Sender: TObject);

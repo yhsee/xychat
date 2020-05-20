@@ -13,6 +13,7 @@ type
     procedure GetFirendInfor(Params:WideString);
     procedure UpdateFirendInfo(Params:WideString);
     procedure AddFirendInfor(Params:WideString);
+    procedure FinderFirend(Params:WideString);
     procedure FinderReponses(Params:WideString);
   public
     procedure Process(Params:WideString);override;
@@ -90,6 +91,24 @@ begin
 end;
 
 //------------------------------------------------------------------------------
+//  处理探测
+//------------------------------------------------------------------------------
+procedure TFirendModel.FinderFirend(Params:WideString);
+var
+  sHost:String;
+  TmpInfor:Tfirendinfo;
+  sParams:WideString;
+begin
+  sHost:=GetNoteFromValue(Params,'Lanip');
+  if not User.Find(LoginUserSign,TmpInfor) then exit;
+  //回应用户的探测
+  AddValueToNote(sParams,'function',Firend_Function);
+  AddValueToNote(sParams,'operation',FinderResponses_Operation);
+  AddValueToNote(sParams,'UserSign',LoginUserSign);
+  AddValueToNote(sParams,'FirendInfor',TmpInfor,SizeOf(Tfirendinfo)-108);
+  udpcore.SendServer(sParams,sHost);
+end;
+//------------------------------------------------------------------------------
 //  处理探测回应
 //------------------------------------------------------------------------------
 procedure TFirendModel.FinderReponses(Params:WideString);
@@ -150,6 +169,7 @@ begin
       GetFirendInfor_Operation:GetFirendInfor(Params);
       SendFirendInfor_Operation:UpdateFirendInfo(Params);
       Firend_Add_Operation:AddFirendInfor(Params);
+      FinderBroadCast_Operation:FinderFirend(Params);
       FinderResponses_Operation:FinderReponses(Params);
       else WriteLog('未知的操作动词');
       end;

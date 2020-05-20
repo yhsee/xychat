@@ -1,8 +1,8 @@
 object Frame_ControlCenter: TFrame_ControlCenter
   Left = 0
   Top = 0
-  Width = 435
-  Height = 266
+  Width = 443
+  Height = 277
   Align = alClient
   AutoScroll = False
   Color = clWhite
@@ -17,7 +17,7 @@ object Frame_ControlCenter: TFrame_ControlCenter
   object Panel_Search: TPanelEx
     Left = 0
     Top = 61
-    Width = 435
+    Width = 443
     Height = 30
     Align = alTop
     BevelOuter = bvNone
@@ -34,7 +34,7 @@ object Frame_ControlCenter: TFrame_ControlCenter
       TabOrder = 1
     end
     object Image_Search2: TPanelEx
-      Left = 409
+      Left = 417
       Top = 0
       Width = 26
       Height = 30
@@ -60,7 +60,7 @@ object Frame_ControlCenter: TFrame_ControlCenter
     object Image_Search1: TPanelEx
       Left = 12
       Top = 0
-      Width = 397
+      Width = 405
       Height = 30
       Align = alClient
       BevelOuter = bvNone
@@ -90,7 +90,7 @@ object Frame_ControlCenter: TFrame_ControlCenter
   object Panel_PageHearder: TPanelEx
     Left = 0
     Top = 91
-    Width = 435
+    Width = 443
     Height = 33
     Align = alTop
     BevelOuter = bvNone
@@ -139,7 +139,7 @@ object Frame_ControlCenter: TFrame_ControlCenter
     object Image_PageLine: TPanelEx
       Left = 256
       Top = 0
-      Width = 179
+      Width = 187
       Height = 33
       Picture.Data = {
         07544269746D6170D6020000424DD60200000000000042000000280000000900
@@ -173,8 +173,8 @@ object Frame_ControlCenter: TFrame_ControlCenter
   object Panel_List: TPanelEx
     Left = 0
     Top = 124
-    Width = 435
-    Height = 93
+    Width = 443
+    Height = 104
     Align = alClient
     BevelOuter = bvNone
     Color = clWhite
@@ -182,8 +182,8 @@ object Frame_ControlCenter: TFrame_ControlCenter
     object Page_Control: TPageControl
       Left = 0
       Top = 0
-      Width = 435
-      Height = 93
+      Width = 443
+      Height = 104
       ActivePage = Ts_UserList
       Align = alClient
       Style = tsFlatButtons
@@ -194,8 +194,8 @@ object Frame_ControlCenter: TFrame_ControlCenter
         object Si_IMUserList: TTreeView
           Left = 0
           Top = 0
-          Width = 427
-          Height = 83
+          Width = 435
+          Height = 94
           Align = alClient
           BorderStyle = bsNone
           Ctl3D = False
@@ -211,8 +211,8 @@ object Frame_ControlCenter: TFrame_ControlCenter
         object Sn_IMNewlyList: TTntTreeView
           Left = 0
           Top = 0
-          Width = 427
-          Height = 83
+          Width = 435
+          Height = 94
           Align = alClient
           BorderStyle = bsNone
           Ctl3D = False
@@ -231,7 +231,7 @@ object Frame_ControlCenter: TFrame_ControlCenter
   object Image_InfoCenter: TPanelEx
     Left = 0
     Top = 0
-    Width = 435
+    Width = 443
     Height = 61
     Align = alTop
     BevelOuter = bvNone
@@ -312,8 +312,8 @@ object Frame_ControlCenter: TFrame_ControlCenter
   end
   object Image_ControlBkg: TPanelEx
     Left = 0
-    Top = 217
-    Width = 435
+    Top = 228
+    Width = 443
     Height = 49
     Align = alBottom
     BevelOuter = bvNone
@@ -333,7 +333,7 @@ object Frame_ControlCenter: TFrame_ControlCenter
       Width = 47
       Height = 21
       Cursor = crHandPoint
-      Hint = #28857#20987#36827#20837#25105#30340#23433#20840#23384#20648#31354#38388
+      Hint = #21151#33021#26410#24320#21457
       AutoSize = True
       ParentShowHint = False
       Picture.Data = {

@@ -23,20 +23,20 @@ type
     bStatus:Boolean;
     FLogEvent:TWriteLogEvent;
     FBindSocket:TSocket;
-    FSLock,FRlock:TRTLCriticalSection;
+    FRLock,FSLock:TRTLCriticalSection;
     FRecvThread:TCustomThread;
     procedure SocketOnWorkProc(Sender:TObject);
   protected
-    FOnUDPRead:TUDPReadEvent;
+    FOnUDPBaseRead:TUDPReadEvent;
     FBinding: TSocketHandle;
-    procedure WriteLogEvent(Sender:TObject;iErrorCode:Integer;sLog:String);  
+    procedure WriteLogEvent(Sender:TObject;iErrorCode:Integer;sLog:String);
     procedure UDPBaseOnUDPRead(Sender: TObject; var buf;bufSize:Word;ABinding: TSocketHandle);virtual;
   public
     function InitServer(sHost:String;iPort:Word):Boolean;
-    procedure SendBuffer(sHost:String;iPort:Word;var buf;bufSize:Word);
+    procedure SendBuffer(sHost:String;iPort:Word;var buf;bufSize:Word);     
     procedure CloseServer;
   published
-    property OnUDPRead:TUDPReadEvent Write FOnUDPRead;
+    property OnUDPBaseRead:TUDPReadEvent Write FOnUDPBaseRead;
     property LogEvent:TWriteLogEvent write FLogEvent;
     property Active:Boolean Read bStatus;
   end;
@@ -73,12 +73,12 @@ end;
 //------------------------------------------------------------------------------
 destructor TUDPBase.Destroy;
 begin
-  CloseServer;
-  WSACleanup();
+  if bStatus then CloseServer;
   if assigned(FRecvThread) then
     FreeAndNil(FRecvThread);
-  DeleteCriticalSection(FRLock);
+  WSACleanup();
   DeleteCriticalSection(FSLock);
+  DeleteCriticalSection(FRLock);
 end;
 
 
@@ -120,8 +120,8 @@ begin
   iLen:=High(Word);
   Setsockopt(FBindSocket, SOL_SOCKET, SO_RCVBUF, @iLen, SizeOf(Integer));
 
-  FBinding.IP:=inet_ntoa(AddrIn.sin_addr);
-  FBinding.Port:=htons(AddrIn.sin_port);
+  FBinding.PeerIP:=inet_ntoa(AddrIn.sin_addr);
+  FBinding.PeerPort:=htons(AddrIn.sin_port);
   bStatus:=True;
   
   Result:=bStatus;
@@ -139,7 +139,7 @@ end;
 
 procedure TUDPBase.UDPBaseOnUDPRead(Sender: TObject; var buf;bufSize:Word;ABinding: TSocketHandle);
 begin
-  if Assigned(FOnUDPRead) then FOnUDPRead(Sender,buf,bufSize,ABinding);
+  if Assigned(FOnUDPBaseRead) then FOnUDPBaseRead(Sender,buf,bufSize,ABinding);
 end;
 
 procedure TUDPBase.SocketOnWorkProc(Sender:TObject);
@@ -151,14 +151,19 @@ var
 begin
   Try
   EnterCriticalSection(FRLock);
+  if not bStatus then
+    begin
+    Sleep(10);
+    exit;
+    end;
   if bStatus then
     try
     iLen:=SizeOf(TSockAddr);
     BufSize:=Recvfrom(FBindSocket,Buf,High(Word),0,@AddrIn,iLen);
     if BufSize>0 then
       begin
-      ABind.IP:=inet_ntoa(AddrIn.sin_addr);
-      ABind.Port:=htons(AddrIn.sin_port);
+      ABind.PeerIP:=inet_ntoa(AddrIn.sin_addr);
+      ABind.PeerPort:=htons(AddrIn.sin_port);
       UDPBaseOnUDPRead(nil,Buf,BufSize,ABind);
       end;
     except

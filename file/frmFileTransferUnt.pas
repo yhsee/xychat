@@ -21,6 +21,7 @@ type
   private
     FServer:boolean;                           //标志模式
 
+    FileTransferEvent:Pointer;
     FUserSign,FIdentifier:String;                     // firendid
 
     sFileinfor,                     //传输文件任务信息
@@ -30,7 +31,7 @@ type
 
     iCurFileBlock:LongWord;
 
-    iListCount,        //文件数量
+    iListCount,
     iSumSize:int64;    //总任务文件尺寸大小
 
     InitiativeClose,
@@ -48,7 +49,7 @@ type
     procedure savebtnClick(Sender: TObject);
     procedure InitialUDPConnect(Params:WideString);
     procedure UDPFileonSendComplete(Sender:TObject);
-    procedure UDPFileonRecvReady(Sender:TObject;var AData:TStream;iSize:Int64);
+    procedure UDPFileonRecvReady(Sender:TObject;var sNewFileName:WideString; iSize:Int64);
     procedure UDPFileProcessEvent(Sender:TObject;iPosition,iCount:LongWord;iSize:Int64);
     function GetTransCompleteInfor(sTitle:WideString;const bComplete:Boolean=False):Widestring;
     //--------------------------------------------------------------------------
@@ -60,6 +61,8 @@ type
     procedure filetran_cancel;
     procedure filetran_refuse;
     procedure filetran_complete;
+    procedure filetran_update(sParams:WideString);
+    procedure filetran_process(sParams:WideString);
     procedure UserStatusChange;
     { Private declarations }
   public
@@ -73,6 +76,7 @@ uses ShareUnt, udpcores,SimpleXmlUnt,userunt;
 
 procedure TfrmFileTransfer.EventProcess(Sender:TObject;TmpEvent:TEventData);
 begin
+  Application.ProcessMessages;
   case TmpEvent.iEvent of
   //------------------------------------------------------------------------------
   // 刷新要改变状态的用户
@@ -85,6 +89,8 @@ begin
     File_Refuse_Event: FileTran_refuse;
     File_Cancel_Event: FileTran_cancel;
     File_Complete_Event: filetran_complete;
+    File_UpdateInfor_Event: filetran_update(TmpEvent.UserParams);
+    File_UpdateProcess_Event:filetran_process(TmpEvent.UserParams);
 
     Close_Form_Event:Close;
   end;
@@ -208,19 +214,67 @@ begin
   event.CreateDialogEvent(File_Complete_Event,FUserSign,IntToStr(Handle));
 end;
 
+procedure TfrmFileTransfer.filetran_update(sParams:WideString);
+var
+  sFileName:WideString;
+  iSize:Int64;
+begin
+  sFileName:=GetNoteFromValue(sParams,'sFileName');
+  iSize:=GetNoteFromValue(sParams,'iSize');
+  ChangeIconImage(WideExtractFileName(sFileName));
+  lab_Filename.Caption:=GetShortFilename(WideExtractFileName(sFileName),lab_Filename.Width);
+  lab_Filesize.Caption:=FormatSize(iSize,false);
+  lab_Filename.Hint:=sFileName;
+end;
+
+procedure TfrmFileTransfer.filetran_process(sParams:WideString);
+var
+  iPosition,iCount:LongWord;
+  iSize:Int64;
+  iTmpCount:LongWord;
+begin
+  iTmpCount:=iCurFileBlock;
+  if iTmpCount>0 then
+  if not FServer then dec(iTmpCount);
+
+  iCount:=GetNoteFromValue(sParams,'iCount');
+  iPosition:=GetNoteFromValue(sParams,'iPosition');
+  iSize:=GetNoteFromValue(sParams,'iSize');
+  Lab_speed.Caption:=WideFormat('%s/s (已完成 %d%%)',[FormatSize(iSize,false),Round(iTmpCount*100/iListCount)]);
+  UpdateProcess(iCount,iPosition);
+end;
+
 procedure TfrmFileTransfer.filetran_complete;
 begin
   InitiativeClose:=false;
   if FServer then
     udpcore.InsertFirendHintMessage(FUserSign,GetTransCompleteInfor(' 成功发送',True))
     else udpcore.InsertFirendHintMessage(FUserSign,GetTransCompleteInfor(' 成功接收',True));
-    event.CreateDialogEvent(File_Complete_Event,FUserSign,IntToStr(Handle));
+  event.CreateDialogEvent(File_Complete_Event,FUserSign,IntToStr(Handle));
 end;
 
 
 procedure TfrmFileTransfer.cancelbtnClick(Sender: TObject);
 begin
   event.CreateDialogEvent(File_Complete_Event,FUserSign,IntToStr(Handle));
+end;
+
+procedure TfrmFileTransfer.UDPFileonRecvReady(Sender:TObject;var sNewFileName:WideString; iSize:Int64);
+begin
+  inc(iCurFileBlock);
+  sNewFileName:=ConCat(sRecvFilePath,UTF8Decode(UDPFile.sReserve));
+  ForceCreateDirectorys(WideExtractFilePath(sNewFileName));
+  UpdateFileInfor(sNewFileName,iSize);
+end;
+
+procedure TfrmFileTransfer.UDPFileProcessEvent(Sender:TObject;iPosition,iCount:LongWord;iSize:Int64);
+var
+  sParams:WideString;
+begin
+  AddValueToNote(sParams,'iPosition',iPosition);
+  AddValueToNote(sParams,'iCount',iCount);
+  AddValueToNote(sParams,'iSize',iSize);
+  event.CreateFileEvent(File_UpdateProcess_Event,UDPFile.Identifier,sParams);
 end;
 
 procedure TfrmFileTransfer.UDPFileonSendComplete(Sender:TObject);
@@ -247,37 +301,14 @@ begin
     end;
 end;
 
-procedure TfrmFileTransfer.UDPFileonRecvReady(Sender:TObject;var AData:TStream;iSize:Int64);
-var
-  sFileName:WideString;
-begin
-  inc(iCurFileBlock);
-  if assigned(AData) then freeandnil(AData);
-  sFileName:=ConCat(sRecvFilePath,UTF8Decode(UDPFile.sReserve));
-  ForceCreateDirectorys(WideExtractFilePath(sFileName));
-  UpdateFileInfor(sFileName,iSize);
-  if WideFileExists(sFileName) then
-    AData:=TTntFileStream.Create(sFileName,fmOpenWrite or fmShareDenyNone)
-    else AData:=TTntFileStream.Create(sFileName,fmCreate or fmShareDenyNone);
-end;
 
 procedure TfrmFileTransfer.UpdateFileInfor(sFileName:WideString;iSize:Int64);
-begin
-  ChangeIconImage(WideExtractFileName(sFileName));
-  lab_Filename.Caption:=GetShortFilename(WideExtractFileName(sFileName),lab_Filename.Width);
-  lab_Filesize.Caption:=FormatSize(iSize,false);
-  lab_Filename.Hint:=sFileName;
-end;
-
-procedure TfrmFileTransfer.UDPFileProcessEvent(Sender:TObject;iPosition,iCount:LongWord;iSize:Int64);
 var
-  iTmpCount:LongWord;
+  sParams:WideString;
 begin
-  iTmpCount:=iCurFileBlock;
-  if iTmpCount>0 then
-  if not FServer then dec(iTmpCount);
-  Lab_speed.Caption:=WideFormat('%s/s (已完成 %d%%)',[FormatSize(iSize,false),Round(iTmpCount*100/iListCount)]);
-  UpdateProcess(iCount,iPosition,True);
+  AddValueToNote(sParams,'sFileName',sFileName);
+  AddValueToNote(sParams,'iSize',iSize);
+  event.CreateFileEvent(File_UpdateInfor_Event,UDPFile.Identifier,sParams);
 end;
 
 //******************************************************************************
@@ -315,7 +346,7 @@ begin
   UDPFile.InitialUdpTransfers('0.0.0.0');
   UDPFile.OnUDPSendComplete:=UDPFileonSendComplete;
   UDPFile.OnUDPRecvReady:=UDPFileonRecvReady;
-  Event.CreateEventProcess(EventProcess,Event_File,UDPFile.Identifier);
+  FileTransferEvent:=Event.CreateEventProcess(EventProcess,Event_File,UDPFile.Identifier);
 end;
 
 //显示面板
@@ -406,8 +437,11 @@ end;
 
 procedure TfrmFileTransfer.FormDestroy(Sender: TObject);
 begin
+  if FServer then
+    UDPFile.OnSendProcessEvent:=nil
+    else UDPFile.OnRecvProcessEvent:=nil;
   CloseTrans;
-  Event.RemoveEventProcess(Event_File,UDPFile.Identifier);
+  Event.RemoveEventProcess(FileTransferEvent);
   if assigned(UDPFile) then
     freeandnil(UDPFile);
   if assigned(SendFileList) then

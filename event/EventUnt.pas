@@ -17,10 +17,11 @@ type
   private
     FEventThread:TEventThread;
   protected
+    procedure SetStatus(bStatus:Boolean);
     procedure CreateEvent(iType:TEventType;iEvent:Integer;sUserSign:String;sParams:WideString);
   public
-    procedure CreateEventProcess(Sender:TOnEventProcess;iType:TEventType;Const sUserSign:String='');
-    procedure RemoveEventProcess(iType:TEventType;Const sUserSign:String='');
+    function CreateEventProcess(Sender:TOnEventProcess;iType:TEventType;Const sUserSign:String=''):Pointer;
+    procedure RemoveEventProcess(TmpEvent:Pointer);
     //--------------------------------------------------------------------------
     procedure CreateAllEvent(iEvent:Integer;sUserSign:String;sParams:WideString);
     procedure CreateMainEvent(iEvent:Integer;sUserSign:String;sParams:WideString);
@@ -31,6 +32,7 @@ type
     procedure CreateFileEvent(iEvent:Integer;sUserSign:String;sParams:WideString);
     procedure CreateAssistEvent(iEvent:Integer;sUserSign:String;sParams:WideString);
   published
+    property Status:boolean write SetStatus;
   end;
 
 var
@@ -50,50 +52,50 @@ begin
   Inherited;
 end;
 
-procedure TEvent.CreateEventProcess(Sender:TOnEventProcess;iType:TEventType;Const sUserSign:String='');
+function TEvent.CreateEventProcess(Sender:TOnEventProcess;iType:TEventType;Const sUserSign:String=''):Pointer;
 var
   TmpEvent:PEventProcess;
 begin
   New(TmpEvent);
+  try
   TmpEvent.UserSign:=sUserSign;
   TmpEvent.iType:=iType;
   TmpEvent.OnEvent:=Sender;
-  EventList.Add(TmpEvent);
+  TmpEvent.iDelete:=False;
+  FEventThread.AddEventProcessList(TmpEvent);
+  Result:=TmpEvent;
+  except
+  Dispose(TmpEvent);
+  Result:=nil;
+  end;
 end;
 
-procedure TEvent.RemoveEventProcess(iType:TEventType;Const sUserSign:String='');
-var
-  i:Integer;
-  TmpEvent:PEventProcess;
+procedure TEvent.RemoveEventProcess(TmpEvent:Pointer);
 begin
-  try
-  with EventList.LockList do
-  for i:=Count downto 1 do
-    begin
-    TmpEvent:=Items[i-1];
-    if TmpEvent.iType=iType then
-    if CompareText(TmpEvent.UserSign,sUserSign)=0 then
-      begin
-      Delete(i-1);
-      Dispose(TmpEvent);
-      Break;
-      end;
-    end;
-  finally
-  EventList.UnlockList;
-  end;
+  PEventProcess(TmpEvent).iDelete:=true;
+  PEventProcess(TmpEvent).OnEvent:=nil;
 end;
 
 procedure TEvent.CreateEvent(iType:TEventType;iEvent:Integer;sUserSign:String;sParams:WideString);
 var
-  TmpEvent:PEventData;
+  TmpData:PEventData;
 begin
-  NewEventRawData(Pointer(TmpEvent));
-  TmpEvent.iEvent:=iEvent;
-  TmpEvent.iType:=iType;
-  TmpEvent.UserSign:=sUserSign;
-  TmpEvent.UserParams:=sParams;
-  AppendEventRawData(TmpEvent);
+  try
+  FEventThread.NewEventRawData(TmpData);
+  TmpData.iEvent:=iEvent;
+  TmpData.iType:=iType;
+  TmpData.UserSign:=sUserSign;
+  TmpData.UserParams:=sParams;
+  FEventThread.AppendEventRawData(TmpData);
+  except
+  FEventThread.AppendEventFreeData(TmpData);
+  end;
+end;
+
+
+procedure TEvent.SetStatus(bStatus:Boolean);
+begin
+  FEventThread.Status:=bStatus;
 end;
 
 procedure TEvent.CreateAllEvent(iEvent:Integer;sUserSign:String;sParams:WideString);

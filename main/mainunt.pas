@@ -105,6 +105,7 @@ type
     procedure ITEM_OnlyOnlineClick(Sender: TObject);
   private
     FClipView:HWND;
+    MainEvent:Pointer;
     FlashFirend_List:TStringList;
     cur_status_auto:boolean;
     fControlCenter:TFrame_ControlCenter;
@@ -149,7 +150,7 @@ type
     procedure Lab_SearchClick(Sender:TObject);
     procedure Ed_SearchKeyChange(Sender:TObject);
     procedure NickNameAndStateClick(Sender: TObject);
-    procedure ITEM_MySpaceClick(Sender: TObject);
+    procedure ITEM_MySpacesClick(Sender: TObject);
     procedure UserListClick(Sender: TObject);
     procedure Ed_KeyExit(Sender: TObject);
     procedure MainMenuClick(Sender: TObject);
@@ -211,6 +212,7 @@ var
   TmpNode:TTntTreeNode;
   TmpInfor:TFirendInfo;
 begin
+  Application.ProcessMessages;
   case TmpEvent.iEvent of
   //------------------------------------------------------------------------------
   // 刷新要改变状态的用户
@@ -620,7 +622,7 @@ procedure TMainForm.FormCreate(Sender: TObject);
 begin
   inherited;
   FlashFirend_List:=TStringList.Create;
-  Event.CreateEventProcess(EventProcess,Event_Main);
+  MainEvent:=Event.CreateEventProcess(EventProcess,Event_Main);
   MainTrayIcon.PopupMenu := StatusPopup;
   MainTrayIcon.PopupMenuEx := MainPopup;
   Main_Hwnd := Handle;
@@ -1190,7 +1192,7 @@ begin
   fControlCenter.Lab_Search.OnClick:=Lab_SearchClick;
   fControlCenter.Ed_SearchKey.OnKeyDown:=Ed_SearchKeyDown;
   fControlCenter.Ed_SearchKey.OnChange:=Ed_SearchKeyChange;
-  ITEM_MySpace.OnClick:=ITEM_MySpaceClick;
+  ITEM_MySpace.OnClick:=ITEM_MySpacesClick;
   //------------------------------------------------------------------------------
   // 初始化列表...
   //------------------------------------------------------------------------------
@@ -1376,9 +1378,9 @@ if assigned(fControlCenter) then
   end;
 end;
 
-procedure TMainForm.ITEM_MySpaceClick(Sender: TObject);
+procedure TMainForm.ITEM_MySpacesClick(Sender: TObject);
 begin
-
+  ShellExecute(Application.Handle,nil,'https://www.yhsee.com',nil,nil,SW_SHOWNORMAL);
 end;
 
 
@@ -1462,7 +1464,7 @@ begin
   //退出剪贴板 事件链
   ChangeClipboardChain(Main_Hwnd,FClipView);
   SendMessage(FClipView,WM_CHANGECBCHAIN,Main_Hwnd,FClipView);
-  Event.RemoveEventProcess(Event_Main);
+  Event.RemoveEventProcess(MainEvent);
   if assigned(FlashFirend_List) then freeandnil(FlashFirend_List);
   inherited;  
 end;

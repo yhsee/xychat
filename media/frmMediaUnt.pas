@@ -28,6 +28,7 @@ Type
     FVideoPlayback,
     FVideoPerview:TVideoPlayback;
 
+    MediaEvent:Pointer;
     UDPMedia:TUDPStream;
 
     FServer:boolean;    //请求方与被邀请方
@@ -72,6 +73,7 @@ uses udpcores,shareunt,funVolume,md5unt,SimpleXmlunt,userunt,EventUnt;
 
 procedure TfrmMedia.EventProcess(Sender:TObject;TmpEvent:TEventData);
 begin
+  Application.ProcessMessages;
   case TmpEvent.iEvent of
   //------------------------------------------------------------------------------
   // 刷新要改变状态的用户
@@ -123,9 +125,8 @@ var
 begin
   try
   TmpStream:=TMemoryStream.Create;
-  ControlFlash(True);
   if user.find(FUserSign,TmpInfor) then
-    begin
+    try
     udpcore.VideoDirectShow.Videostart;
 
     udpcore.VideoDirectShow.GetVideoMediaType(TmpStream);
@@ -137,6 +138,9 @@ begin
     AddValueToNote(sParams,'MediaPort',UDPMedia.LocalPort);
     AddValueToNote(sParams,'VMediaTypes',TmpStream);
     udpcore.SendServertransfer(sParams,FUserSign);
+    except
+    on e:exception do
+     logmemo.Add(e.Message);
     end;
 
   finally
@@ -151,24 +155,26 @@ var
 begin
   try
   TmpStream:=TMemoryStream.Create;
-  ControlFlash(False);
   InitialUDPConnect(Params);
   GetNoteFromValue(Params,'VMediaTypes',TmpStream);
   FVideoplayback.StartPlayback(TmpStream);
   just_talking:=True;
   if FServer then
-    begin
+    try
     udpcore.VideoDirectShow.Videostart;
     TmpStream.Clear;
     udpcore.VideoDirectShow.GetVideoMediaType(TmpStream);
     FVideoPerview.StartPlayback(TmpStream);
-    
+
     AddValueToNote(sParams,'function',Media_Function);
     AddValueToNote(sParams,'operation',Media_Accept_Operation);
     AddValueToNote(sParams,'UserSign',LoginUserSign);
     AddValueToNote(sParams,'MediaPort',UDPMedia.LocalPort);
     AddValueToNote(sParams,'VMediaTypes',TmpStream);
     udpcore.SendServertransfer(sParams,FUserSign);
+    except
+    on e:exception do
+      logmemo.Add(e.Message);
     end;
   finally
   freeandnil(TmpStream);
@@ -255,6 +261,7 @@ procedure TfrmMedia.UDPMediaOnDisconnect(Sender:TObject);
 begin
   if just_talking then
     begin
+    just_talking:=false;
     InitiativeClose:=false;
     udpcore.InsertFirendHintMessage(FUserSign,WideString('语音视频通道超时断开！'));
     event.CreateDialogEvent(Media_Complete_Event,FUserSign,'');
@@ -406,6 +413,7 @@ begin
   Lab_Menu.OnClick:=Lab_MenuClick;
   Lab_Yes.OnClick:=Lab_YesClick;
   Lab_Close.OnClick:=Lab_CloseClick;
+
   RzTb_Sound.OnChange:=setwaveaudio;
   RzTb_MicroPhone.OnChange:=setwaveaudio;
   OnMuteClick:=setwavemute;
@@ -434,8 +442,7 @@ begin
   udpcore.VideoDirectShow.VideoStop;
   JustAVideoConnect:=false;
   CloseTrans;
-  FInitializeBox;
-  Event.RemoveEventProcess(Event_Media,FUserSign);
+  Event.RemoveEventProcess(MediaEvent);
   if assigned(FVideoPerview) then freeandnil(FVideoPerview);
   if assigned(FVideoPlayback) then freeandnil(FVideoPlayback);
   if assigned(UDPMedia) then freeandnil(UDPMedia);
@@ -451,7 +458,7 @@ begin
   FUserSign:=sUserSign;
   if not user.Find(LoginUserSign,myinfo) then exit;
   if not user.Find(FUserSign,TmpInfor) then exit;
-  Event.CreateEventProcess(EventProcess,Event_Media,FUserSign);
+  MediaEvent:=Event.CreateEventProcess(EventProcess,Event_Media,FUserSign);
 
   Lab_UserNameSmall.Caption:=myinfo.uname;
   Lab_UserName.Caption:=TmpInfor.uname;

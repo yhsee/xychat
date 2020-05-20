@@ -13,10 +13,13 @@ uses Windows,Messages,SysUtils,Classes,CustomThreadUnt,AnalyzerCommonUnt,
      FileModelUnt,RemoteModelUnt,AssistModelUnt;
 
 type
+  TLogEvent=procedure(Sender:TObject;sLog:WideString)of Object;
   TanalyzerThread=class(TComponent)
     constructor Create(AOwner: TComponent); override;
     destructor Destroy;override;
   private
+    bStatus:Boolean;
+    FWriteLogEvent:TLogEvent;
     AssistModel:TAssistModel;
     RemoteModel:TRemoteModel;
     FileModel:TFileModel;
@@ -25,16 +28,26 @@ type
     FirendModel:TFirendModel;
     SystemModel:TSystemModel;
     FPrivateThread:TCustomThread;
+    RawDataList,
+    FreeDataList:TThreadList;
     procedure analyzerproc(Sender:TObject);
     procedure ClientCoreProcess(P:Pointer);
     procedure WriteLog(Sender:TObject;sLog:WideString);
+    procedure DestoryList(TmpList:TThreadList);
+    function GetOneRawData(var TmpData:PRawData):boolean;
   protected
   public
+    procedure NewRawData(var TmpData:PRawData);
+    procedure AddRawDataList(TmpData:PRawData);
+    procedure AddFreeDataList(TmpData:PRawData);
+  published
+    property WriteLogEvent:TLogEvent write FWriteLogEvent;
+    property Status:boolean write bStatus;
   end;
 
 implementation
 
-uses ActiveX,ShareUnt,structureunt,constunt,SimpleXmlUnt,desunt,zlibex;
+uses ActiveX,structureunt,constunt,SimpleXmlUnt,desunt,zlibex;
 
 //------------------------------------------------------------------------------
 //   创建过程
@@ -42,6 +55,9 @@ uses ActiveX,ShareUnt,structureunt,constunt,SimpleXmlUnt,desunt,zlibex;
 constructor TanalyzerThread.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
+  bStatus:=False;
+  RawDataList:=TThreadList.Create;
+  FreeDataList:=TThreadList.Create;
   //-----------------------------------------------------------------------------
   SystemModel:=TSystemModel.Create;
   SystemModel.WriteLogEvent:=WriteLog;
@@ -69,9 +85,71 @@ begin
   //-----------------------------------------------------------------------------
 end;
 
+
+procedure TanalyzerThread.DestoryList(TmpList:TThreadList);
+var i:integer;
+begin
+try
+with TmpList.LockList do
+  for i:=Count downto 1 do
+   begin
+   Dispose(Items[i-1]);
+   delete(i-1);
+   end;
+finally
+TmpList.UnlockList;
+end;
+end;
+
+procedure TanalyzerThread.NewRawData(var TmpData:PRawData);
+begin
+  try
+  with FreeDataList.LockList do
+    begin
+    if Count>0 then
+      begin
+      TmpData:=Items[0];
+      delete(0);
+      end else begin
+      New(TmpData);
+      end;
+    end;
+  finally
+  FreeDataList.UnlockList;
+  end;
+end;
+
+procedure TanalyzerThread.AddRawDataList(TmpData:PRawData);
+begin
+  RawDataList.Add(TmpData);
+end;
+
+procedure TanalyzerThread.AddFreeDataList(TmpData:PRawData);
+begin
+  FreeDataList.Add(TmpData);
+end;
+
+function TanalyzerThread.GetOneRawData(var TmpData:PRawData):boolean;
+begin
+  try
+  with RawDataList.LockList do
+    begin
+    result:=false;
+    if Count>0 then
+      begin
+      TmpData:=Items[0];
+      delete(0);
+      result:=true;
+      end;
+    end;
+  finally
+  RawDataList.UnlockList;
+  end;
+end;
+
 procedure TanalyzerThread.WriteLog(Sender:TObject;sLog:WideString);
 begin
-  logmemo.add(sLog);
+  if assigned(FWriteLogEvent) then FWriteLogEvent(Sender,sLog);
 end;
 
 //------------------------------------------------------------------------------
@@ -79,6 +157,7 @@ end;
 //------------------------------------------------------------------------------
 destructor TanalyzerThread.Destroy;
 begin
+  bStatus:=False;
   if assigned(FPrivateThread) then freeandnil(FPrivateThread);
   if assigned(AssistModel) then freeandnil(AssistModel);
   if assigned(RemoteModel) then freeandnil(RemoteModel);
@@ -87,6 +166,10 @@ begin
   if assigned(MessageModel) then freeandnil(MessageModel);
   if assigned(FirendModel) then freeandnil(FirendModel);
   if assigned(SystemModel) then freeandnil(SystemModel);
+  DestoryList(RawDataList);
+  freeandnil(RawDataList);
+  DestoryList(FreeDataList);
+  freeandnil(FreeDataList);
   inherited Destroy;
 end;
 
@@ -95,8 +178,13 @@ end;
 //------------------------------------------------------------------------------
 procedure TanalyzerThread.analyzerproc(Sender:TObject);
 var
-  TmpData:Pointer;
+  TmpData:PRawData;
 begin
+  if not bStatus then
+    begin
+    sleep(10);
+    exit;
+    end;
   if not GetOneRawData(TmpData) then
     begin
     sleep(10);
@@ -119,19 +207,15 @@ var
   sParams:WideString;
   sFunction:WideString;
 begin
-  if not ClientRun then exit;
+  if not bStatus then exit;
   try
-    
-  //版本检查
-  if PRawData(P)^.DataHead.Version<>DataVersion then exit; //版本不一致.
 
-  SetLength(Params,PRawData(P)^.DataHead.DataLen);
-  CopyMemory(@Params[1],@PRawData(P)^.DataBuf[0],PRawData(P)^.DataHead.DataLen);
+  SetLength(Params,PRawData(P)^.DataLen);
+  CopyMemory(@Params[1],@PRawData(P)^.DataBuf[0],PRawData(P)^.DataLen);
   sParams:=UTF8Decode(Params);
 
   //取得对方的真正IP
   AddValueToNote(sParams,'Lanip',PRawData(P)^.UserSocket.PeerIP);
-
 
   if CheckNoteExists(sParams,'Function') then
     begin
@@ -145,13 +229,13 @@ begin
       Remote_Function:      RemoteModel.Process(sParams);
       Assist_Function:      AssistModel.Process(sParams);
 
-      else logmemo.Add('错误');
+      else WriteLog(nil,'错误');
       end;
     end;
 
   except
     on e:exception do
-      logmemo.add(e.Message);
+      WriteLog(nil,e.Message);
   end;
 end;
 

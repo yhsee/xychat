@@ -24,6 +24,14 @@ type
       //------------------------------------------------------------------------
       FCaptureEvent:TCaptureEvent;
       FWorkThread:TCustomThread;
+      //------------------------------------------------------------------------
+      function GetForegroundRect:TRect;
+      function CompareRegion(dRect,sRect:TRect):Boolean;
+      function compriseRegion(dRect,sRect:TRect):Boolean;
+      function CalcUnionRegion(TmpRegion:TRect;TmpList:TThreadList):TRect;
+      function GetNextRect(var TmpRect:TRect;TmpList:TThreadList):Boolean;
+      //------------------------------------------------------------------------
+      procedure CalcAddRegion(TmpRegion:TRect;TmpList:TThreadList);
       procedure freeCapture;
       procedure CaptureScreen(rt:TRect);
       procedure CaptureWorkProcess(Sender:TObject);
@@ -42,7 +50,7 @@ implementation
 uses Math;
 
 //检查是否有存在命令行提示窗口存在,有就返其匹域
-function GetForegroundRect:TRect;
+function Tdesksource.GetForegroundRect:TRect;
 var
   hFgWin:HWND;
   cname:array[0..23]of char;
@@ -59,7 +67,7 @@ begin
 end;
 
 //比较两个矩形是否能水平或垂直合并
-function CompareRegion(dRect,sRect:TRect):Boolean;
+function Tdesksource.CompareRegion(dRect,sRect:TRect):Boolean;
 begin
   Result:=False;
   if (dRect.Left=sRect.Left) and (dRect.Right=sRect.Right) then //相同的宽度
@@ -75,7 +83,7 @@ begin
 end;
 
 //比较 dRect 是否被 sRect 包含
-function compriseRegion(dRect,sRect:TRect):Boolean;
+function Tdesksource.compriseRegion(dRect,sRect:TRect):Boolean;
 var
   TmpRect:TRect;
 begin
@@ -86,7 +94,7 @@ begin
 end;
 
 //将当前矩形与现在矩形缓冲列表进行合并 返回合并后的新矩形，否则返回空值
-function CalcUnionRegion(TmpRegion:TRect;TmpList:TThreadList):TRect;
+function Tdesksource.CalcUnionRegion(TmpRegion:TRect;TmpList:TThreadList):TRect;
 var
   Bool:boolean;
   TmpPRegion:PRect;
@@ -144,7 +152,7 @@ begin
 end;
 
 //添加矩形到矩形缓冲列表
-procedure CalcAddRegion(TmpRegion:TRect;TmpList:TThreadList);
+procedure Tdesksource.CalcAddRegion(TmpRegion:TRect;TmpList:TThreadList);
 begin
   //检查是否有合并出新的短形如果是重新进入合并计算
   while not IsRectEmpty(TmpRegion) do
@@ -172,7 +180,7 @@ begin
 end;
 
 //取出矩形缓冲里的第一个数据
-function GetNextRect(var TmpRect:TRect;TmpList:TThreadList):Boolean;
+function Tdesksource.GetNextRect(var TmpRect:TRect;TmpList:TThreadList):Boolean;
 begin
   try
   Result:=False;

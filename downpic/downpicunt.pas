@@ -28,9 +28,8 @@ Type
       FOnComplete:TDownPicComplete;
       FOutTimer:TTimer;
       //------------------------------------------------------------------------
-      procedure UDPRecvReady(Sender:TObject;var AData:TStream;iSize:Int64);
+      procedure UDPRecvReady(Sender:TObject;var sNewFileName:WideString; iSize:Int64);
       procedure UDPRecvComplete(Sender:TObject;AData:TStream);
-      procedure UDPDisconnect(Sender:TObject);
       procedure RecvOutTimer(Sender:TObject);
       //------------------------------------------------------------------------
     public
@@ -58,7 +57,7 @@ begin
   FOutTimer.Enabled:=False;
     
   UDPImage:=TUDPStream.Create;
-  UDPImage.onDisconnect:=UDPDisconnect;
+  UDPImage.onDisconnect:=RecvOutTimer;
   UDPImage.OnUDPRecvComplete:=UDPRecvComplete;
   UDPImage.OnUDPRecvReady:=UDPRecvReady;
   UDPImage.InitialUdpTransfers('0.0.0.0');
@@ -156,15 +155,9 @@ begin
 end;
 
 
-procedure Tdownpic.UDPRecvReady(Sender:TObject;var AData:TStream;iSize:Int64);
-var
-  sFileName:WideString;
+procedure Tdownpic.UDPRecvReady(Sender:TObject;var sNewFileName:WideString; iSize:Int64);
 begin
-  if assigned(AData) then freeandnil(AData);
-  sFileName:=ConCat(FDefaultPath,UTF8Decode(UDPImage.sReserve));
-  if WideFileExists(sFileName) then
-    AData:=TTntFileStream.Create(sFileName,fmOpenWrite or fmShareDenyWrite)
-    else AData:=TTntFileStream.Create(sFileName,fmCreate or fmShareDenyWrite);
+  sNewFileName:=ConCat(FDefaultPath,UTF8Decode(UDPImage.sReserve));
 end;
 
 //------------------------------------------------------------------------------
@@ -182,13 +175,6 @@ begin
   sTmpStr:=FCurFileSign;
   FCurFileSign:='';
   event.CreateDialogEvent(UserImage_Complete_Event,UserSign,sTmpStr);
-end;
-
-procedure Tdownpic.UDPDisconnect(Sender:TObject);
-begin
-  FOutTimer.Enabled:=False;
-  if assigned(FOnComplete) then
-    FOnComplete(nil,FCurFileSign);
 end;
 
 end.
